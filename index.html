@@ -139,6 +139,35 @@
     margin-bottom:10px;
     width:100%;
     max-width:280px;
+    cursor:pointer;
+  }
+
+  .tap-hint{
+    width:100%;
+    max-width:480px;
+    text-align:center;
+    font-size:0.75rem;
+    color:var(--muted);
+    margin:-4px 0 10px;
+  }
+  @media (hover:hover) and (pointer:fine){
+    /* Devices with a real mouse (i.e. desktop) already have a physical
+       keyboard — no need for the tap hint or its pointer affordance. */
+    .tap-hint{ display:none; }
+    #board{ cursor:default; }
+  }
+
+  .mobile-input{
+    position:fixed;
+    top:0;
+    left:0;
+    width:1px;
+    height:1px;
+    opacity:0;
+    border:none;
+    padding:0;
+    pointer-events:none;
+    font-size:16px; /* keeps iOS Safari from auto-zooming on focus */
   }
 
   #sidePanel{
@@ -527,6 +556,18 @@
   </div>
 </div>
 
+<p class="tap-hint">Tap the board to type</p>
+
+<!-- Invisible but focusable text field. Its only job is to summon the
+     phone's on-screen keyboard when tapped/focused — all typed letters are
+     read from its value and mirrored into the game state, and the field
+     itself is never shown. Desktop players are unaffected: physical
+     keydown events are still intercepted (and preventDefault'd) globally
+     before they can ever reach this field. -->
+<input type="text" id="mobileInput" class="mobile-input"
+  autocomplete="off" autocorrect="off" autocapitalize="characters"
+  spellcheck="false" inputmode="text" maxlength="4" tabindex="-1" aria-hidden="true">
+
 <div id="mercyPanel">
   <div class="mercy-heading">Mercy granted!</div>
   <div class="mercy-sub">Here's how it plays out.</div>
@@ -738,6 +779,7 @@ const difficultyWrap = document.getElementById("difficultyWrap");
 const curatedWrap = document.getElementById("curatedWrap");
 const statsHeading = document.getElementById("statsHeading");
 const puzzleLabelEl = document.getElementById("puzzleLabel");
+const mobileInputEl = document.getElementById("mobileInput");
 
 // ---------- Flip It ----------
 // Swaps the start and finish word at any point mid-puzzle. Nothing you've
@@ -876,6 +918,13 @@ function render(){
   wordCountEl.textContent = state.chain.length + state.prefill.length;
   updateFlipButtonState();
   updateUncleButtonState();
+
+  // Keep the hidden mobile-keyboard field mirroring the canonical game
+  // state, no matter what caused the change (typing, backward-nav, Flip
+  // It, Restart, etc.) — see the "Mobile keyboard" section below.
+  if(mobileInputEl && mobileInputEl.value !== state.current){
+    mobileInputEl.value = state.current;
+  }
 }
 
 function makeRow(letters, cls, changedIdx, target){
@@ -1072,6 +1121,11 @@ function handleKey(key){
 }
 
 document.addEventListener("keydown", (e)=>{
+  // While the hidden mobile-keyboard field is focused, its own listeners
+  // (below) handle everything — bail out here so this global handler
+  // doesn't also blur it (which would dismiss the phone's keyboard) or
+  // double-process the same keystroke.
+  if(e.target === mobileInputEl) return;
   if(e.metaKey || e.ctrlKey || e.altKey) return;
   if(e.key === "Enter" || e.key === "Backspace" || /^[a-zA-Z]$/.test(e.key)){
     // Prevent default so a focused button (e.g. "New Puzzle") doesn't also
@@ -1085,6 +1139,38 @@ document.addEventListener("keydown", (e)=>{
   }
   handleKey(e.key);
 });
+
+// ---------- Mobile keyboard ----------
+// There's no web API to "open the on-screen keyboard" directly — phones
+// only show it when a real, focusable text field gets focus. mobileInputEl
+// is that field (see its markup: invisible, 1x1, but focusable). Reading
+// its value on every "input" event (rather than trying to interpret
+// individual keydown events) is the most reliable way to capture typing
+// across phones/keyboards, including autocorrect swaps and swipe-typing.
+mobileInputEl.addEventListener("input", () => {
+  if(state.solved){ mobileInputEl.value = ""; return; }
+  if(document.getElementById("uncleOverlay").classList.contains("show")){
+    mobileInputEl.value = state.current;
+    return;
+  }
+  state.current = mobileInputEl.value.replace(/[^a-zA-Z]/g, "").slice(0,4).toLowerCase();
+  render();
+});
+mobileInputEl.addEventListener("keydown", (e) => {
+  // Letters and Backspace are handled by the "input" listener above via
+  // the field's value — only Enter (submit) needs special handling here,
+  // since it never changes the field's text.
+  if(e.key === "Enter"){
+    e.preventDefault();
+    handleKey("Enter");
+  }
+});
+
+// Tapping the board (or finishing the intro) focuses the hidden field,
+// which is what actually triggers the phone's on-screen keyboard — this
+// has to happen inside a real tap/click handler, not automatically, or
+// most phones will refuse to show the keyboard.
+boardEl.addEventListener("click", () => mobileInputEl.focus({ preventScroll: true }));
 
 // ---------- Stats (localStorage) ----------
 const STATS_KEY = "birdToWordStats_v2";
@@ -1207,20 +1293,33 @@ function withBlur(fn){
   };
 }
 
-document.getElementById("playAgainBtn").onclick = withBlur(()=>{
+// Same as withBlur, but also re-focuses the hidden mobile-keyboard field
+// afterward — for actions that leave the player ready to type again (new
+// puzzle, restart, flip, resuming after "Nope"), this keeps a phone's
+// on-screen keyboard open across the action instead of it closing and
+// needing another tap to bring back.
+function withBlurAndFocus(fn){
+  return (e)=>{
+    fn();
+    if(e && e.currentTarget && e.currentTarget.blur) e.currentTarget.blur();
+    mobileInputEl.focus({ preventScroll: true });
+  };
+}
+
+document.getElementById("playAgainBtn").onclick = withBlurAndFocus(()=>{
   document.getElementById("overlay").classList.remove("show");
   newPuzzle();
 });
 document.getElementById("shortestRow").onclick = withBlur(toggleShortestPath);
 
 // ---------- Wire up controls ----------
-document.getElementById("newPuzzleBtn").onclick = withBlur(newPuzzle);
-document.getElementById("restartBtn").onclick = withBlur(restartPuzzle);
-document.getElementById("flipBtn").onclick = withBlur(flipIt);
+document.getElementById("newPuzzleBtn").onclick = withBlurAndFocus(newPuzzle);
+document.getElementById("restartBtn").onclick = withBlurAndFocus(restartPuzzle);
+document.getElementById("flipBtn").onclick = withBlurAndFocus(flipIt);
 document.getElementById("uncleBtn").onclick = withBlur(openUncleConfirm);
-document.getElementById("uncleNopeBtn").onclick = withBlur(closeUncleConfirm);
+document.getElementById("uncleNopeBtn").onclick = withBlurAndFocus(closeUncleConfirm);
 document.getElementById("uncleYepBtn").onclick = withBlur(unclePuzzle);
-document.getElementById("mercyNewPuzzleBtn").onclick = withBlur(newPuzzle);
+document.getElementById("mercyNewPuzzleBtn").onclick = withBlurAndFocus(newPuzzle);
 
 function populateCuratedSelect(){
   curatedSel.innerHTML = "";
@@ -1317,6 +1416,11 @@ newPuzzle();
     overlay.classList.add("intro-hide");
     gameContent.classList.add("game-show");
     setTimeout(function(){ overlay.remove(); }, 700);
+    // Focus the hidden mobile-keyboard field synchronously, inside this
+    // same tap — phones only allow the on-screen keyboard to pop up when
+    // focus() happens directly inside a real user gesture like this one.
+    var mobileInput = document.getElementById("mobileInput");
+    if(mobileInput) mobileInput.focus({ preventScroll: true });
   }
   startBtn.addEventListener("click", beginGame);
 })();
