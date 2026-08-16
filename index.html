@@ -206,6 +206,78 @@
     40%,60%{ transform:translateX(6px); }
   }
 
+  /* ---------- Intro animation ---------- */
+  #introOverlay{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:var(--bg);
+    transition:opacity 0.5s ease;
+  }
+  #introOverlay.intro-hide{ opacity:0; pointer-events:none; }
+  .intro-wordmark{
+    font-size:1.6rem;
+    font-weight:800;
+    letter-spacing:-0.02em;
+    color:var(--text);
+    margin-bottom:24px;
+  }
+  .intro-wordmark .two{ color:var(--changed); }
+  .intro-board{ display:flex; flex-direction:column; gap:6px; }
+  .intro-row{ display:flex; gap:6px; justify-content:center; }
+  .intro-tile{
+    width:52px;
+    height:52px;
+    border:2px solid var(--border);
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.4rem;
+    font-weight:700;
+    text-transform:uppercase;
+    background:var(--panel);
+    color:var(--text);
+    opacity:0;
+    transform:scale(0.5);
+    transition:transform 0.25s cubic-bezier(.34,1.56,.64,1), background 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.2s ease;
+  }
+  .intro-tile.show{ opacity:1; transform:scale(1); }
+  .intro-tile.locked{ background:#eef2f5; border-color:#c7ccd1; }
+  .intro-tile.changed{ background:var(--changed); border-color:var(--changed); color:var(--changed-text); }
+  .intro-tile.match{ background:var(--match); border-color:var(--match); color:var(--match-text); }
+  .intro-tile.solved{ background:var(--solved); border-color:var(--solved); color:var(--solved-text); }
+  .intro-start-btn{
+    margin-top:28px;
+    padding:10px 28px;
+    font-size:0.95rem;
+    font-weight:700;
+    border-radius:8px;
+    border:1px solid var(--accent);
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+    opacity:0;
+    transform:translateY(6px);
+    transition:opacity 0.4s ease, transform 0.4s ease, background 0.15s ease;
+  }
+  .intro-start-btn.show{ opacity:1; transform:translateY(0); }
+  .intro-start-btn:hover{ background:#316a8f; }
+
+  #gameContent{
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.7s ease;
+  }
+  #gameContent.game-show{
+    opacity:1;
+    pointer-events:auto;
+  }
+
   #message{
     min-height:20px;
     font-size:0.85rem;
@@ -370,6 +442,13 @@
 </head>
 <body>
 
+<div id="introOverlay" aria-hidden="true">
+  <div class="intro-wordmark">BIRD<span class="two">2</span>WORD</div>
+  <div class="intro-board" id="introBoard"></div>
+  <button id="introStartBtn" class="intro-start-btn">Start</button>
+</div>
+
+<div id="gameContent">
 <header>
   <div class="logo-lockup">
     <span class="wordmark">BIRD<span class="two">2</span>WORD</span>
@@ -434,6 +513,7 @@
 </div>
 
 <footer>BIRD2WORD — test build. Dictionary-backed word ladder game.</footer>
+</div>
 
 <div id="overlay">
   <div id="modal">
@@ -1089,6 +1169,67 @@ curatedSel.onchange = newPuzzle;
 buildOnscreenKeyboard();
 populateCuratedSelect();
 newPuzzle();
+</script>
+
+<script>
+// ---------- Intro animation (BIRD -> BARD -> WARD -> WORD) ----------
+(function(){
+  var overlay = document.getElementById("introOverlay");
+  var boardEl = document.getElementById("introBoard");
+  var startBtn = document.getElementById("introStartBtn");
+  var gameContent = document.getElementById("gameContent");
+  if(!overlay || !boardEl || !startBtn || !gameContent) return;
+
+  var STEPS = [
+    { word:"BIRD", locked:true },
+    { word:"BARD", colors:["","changed","match","match"] },
+    { word:"WARD", colors:["changed","","match","match"] },
+    { word:"WORD", solved:true }
+  ];
+
+  STEPS.forEach(function(step){
+    var row = document.createElement("div");
+    row.className = "intro-row";
+    step.word.split("").forEach(function(ch){
+      var tile = document.createElement("div");
+      tile.className = "intro-tile";
+      tile.textContent = ch;
+      row.appendChild(tile);
+    });
+    boardEl.appendChild(row);
+  });
+
+  var rows = boardEl.querySelectorAll(".intro-row");
+  var delay = 400;
+
+  STEPS.forEach(function(step, ri){
+    var tiles = rows[ri].querySelectorAll(".intro-tile");
+    tiles.forEach(function(tile, ti){
+      (function(tile, step, ti){
+        setTimeout(function(){
+          tile.classList.add("show");
+          if(step.locked) tile.classList.add("locked");
+          if(step.solved) tile.classList.add("solved");
+          if(step.colors && step.colors[ti]) tile.classList.add(step.colors[ti]);
+        }, delay);
+      })(tile, step, ti);
+      delay += 140;
+    });
+    delay += 380; // pause between words
+  });
+
+  delay += 500; // hold on the solved word before offering Start
+  setTimeout(function(){
+    startBtn.classList.add("show");
+  }, delay);
+
+  function beginGame(){
+    overlay.classList.add("intro-hide");
+    gameContent.classList.add("game-show");
+    setTimeout(function(){ overlay.remove(); }, 700);
+  }
+  startBtn.addEventListener("click", beginGame);
+})();
 </script>
 
 </body>
