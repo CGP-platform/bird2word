@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BIRD2WORD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#fafafa;
@@ -58,6 +61,13 @@
   .logo-lockup .wordmark .two{ color:var(--changed); }
   .logo-lockup .wordmark .w-bird{ color:var(--match); }
   .logo-lockup .wordmark .w-word{ color:var(--solved); }
+  .beta-badge{
+    font-family:'Permanent Marker', cursive;
+    font-size:1.05rem;
+    color:#000;
+    transform:rotate(-8deg);
+    line-height:1;
+  }
   .tagline{
     margin:6px 0 2px;
     font-size:0.85rem;
@@ -498,6 +508,12 @@
     color:var(--muted);
     text-align:center;
   }
+  footer a{
+    color:var(--accent);
+    text-decoration:none;
+    font-weight:600;
+  }
+  footer a:hover{ text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -512,6 +528,7 @@
 <header>
   <div class="logo-lockup">
     <span class="wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
+    <span class="beta-badge">BETA</span>
   </div>
   <p class="tagline">Swift Words, Sharp Minds.</p>
   <p class="desc">Turn the start word into the target word, one letter at a time.</p>
@@ -588,7 +605,7 @@
   </div>
 </div>
 
-<footer>BIRD2WORD — test build. Dictionary-backed word ladder game.</footer>
+<footer>BIRD2WORD — test build. Dictionary-backed word ladder game. &middot; <a href="about.html">About</a></footer>
 </div>
 
 <div id="overlay">
