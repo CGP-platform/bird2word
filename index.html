@@ -56,6 +56,8 @@
     color:var(--text);
   }
   .logo-lockup .wordmark .two{ color:var(--changed); }
+  .logo-lockup .wordmark .w-bird{ color:var(--match); }
+  .logo-lockup .wordmark .w-word{ color:var(--solved); }
   .tagline{
     margin:6px 0 2px;
     font-size:0.85rem;
@@ -139,7 +141,7 @@
     max-width:280px;
   }
 
-  #hintPanel{
+  #sidePanel{
     width:160px;
     max-width:100%;
     background:var(--panel);
@@ -149,27 +151,19 @@
     text-align:center;
     flex-shrink:0;
   }
-  .hint-btn{
+  .flip-btn{
     width:100%;
-    background:#fff8ea;
-    border-color:var(--changed);
-    color:#8a6d1d;
+    background:#eaf2f7;
+    border-color:var(--accent);
+    color:var(--accent);
     font-weight:600;
   }
-  .hint-btn:hover{ background:#fff1cf; }
-  .hint-btn:disabled{ opacity:0.5; cursor:default; background:#fff8ea; }
-  #hintText{
-    margin-top:8px;
-    font-size:0.72rem;
-    color:var(--muted);
-    line-height:1.4;
-    min-height:14px;
-  }
-  #hintText b{ color:var(--accent); }
-  .hint-note{
+  .flip-btn:hover{ background:#dcebf3; }
+  .flip-btn:disabled{ opacity:0.5; cursor:default; background:#eaf2f7; }
+  .flip-note{
     margin-top:6px;
     font-size:0.65rem;
-    color:var(--error);
+    color:var(--muted);
   }
   .row{
     display:flex;
@@ -194,6 +188,13 @@
   .row.locked-start .tile{ background:#eef2f5; border-color:#c7ccd1; }
   .row.locked-target .tile{ background:#fff8ea; border-color:#e9d8a6; color:#8a6d1d; }
   .row.solved .tile{ background:var(--solved); border-color:var(--solved); color:var(--solved-text); }
+  .row.prefilled .tile{ background:#eef7ec; border-color:#b7dab0; color:#3f6b3a; }
+  .prefill-label{
+    font-size:0.65rem;
+    color:var(--muted);
+    text-align:center;
+    margin:2px 0;
+  }
   /* #board-qualified so these always win over row-level backgrounds
      (locked-start / locked-target / solved) regardless of class order. */
   #board .tile.changed{ background:var(--changed); border-color:var(--changed); color:var(--changed-text); }
@@ -227,6 +228,8 @@
     margin-bottom:24px;
   }
   .intro-wordmark .two{ color:var(--changed); }
+  .intro-wordmark .w-bird{ color:var(--match); }
+  .intro-wordmark .w-word{ color:var(--solved); }
   .intro-board{ display:flex; flex-direction:column; gap:6px; }
   .intro-row{ display:flex; gap:6px; justify-content:center; }
   .intro-tile{
@@ -443,15 +446,15 @@
 <body>
 
 <div id="introOverlay" aria-hidden="true">
-  <div class="intro-wordmark">BIRD<span class="two">2</span>WORD</div>
+  <div class="intro-wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></div>
   <div class="intro-board" id="introBoard"></div>
-  <button id="introStartBtn" class="intro-start-btn">Start</button>
+  <button id="introStartBtn" class="intro-start-btn">Let's Play!</button>
 </div>
 
 <div id="gameContent">
 <header>
   <div class="logo-lockup">
-    <span class="wordmark">BIRD<span class="two">2</span>WORD</span>
+    <span class="wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
   </div>
   <p class="tagline">Swift Words, Sharp Minds.</p>
   <p class="desc">Turn the start word into the target word, one letter at a time.</p>
@@ -478,7 +481,6 @@
 <div class="controls">
   <button id="newPuzzleBtn" class="primary">New Puzzle</button>
   <button id="restartBtn">Restart</button>
-  <button id="undoBtn">Undo</button>
 </div>
 
 <div class="puzzle-label" id="puzzleLabel"></div>
@@ -490,10 +492,9 @@
 
 <div class="board-area">
   <div id="board"></div>
-  <div id="hintPanel">
-    <button id="hintBtn" class="hint-btn">💡 Hint</button>
-    <div id="hintText"></div>
-    <div class="hint-note">Hints lower your score</div>
+  <div id="sidePanel">
+    <button id="flipBtn" class="flip-btn">🔄 Flip It</button>
+    <div class="flip-note">Swap start &amp; finish anytime</div>
   </div>
 </div>
 <div id="message"></div>
@@ -522,7 +523,7 @@
     <div class="score-label">Score</div>
     <div class="row-result"><span>Your time</span><span id="resTime"></span></div>
     <div class="row-result"><span>Words used</span><span id="resWords"></span></div>
-    <div class="row-result"><span>Hints used</span><span id="resHints"></span></div>
+    <div class="row-result"><span>Flips used</span><span id="resFlips"></span></div>
     <div class="row-result clickable" id="shortestRow"><span>Shortest possible</span><span><span id="resBest"></span><span class="chevron">▸</span></span></div>
     <div id="shortestPathReveal">
       <div class="path-chips" id="shortestPathChips"></div>
@@ -647,14 +648,14 @@ function generateCuratedPuzzle(pairIndex){
 // far more than solving fast. Word-efficiency is squared so it dominates;
 // speed is a softer diminishing multiplier; harder puzzles (longer optimal
 // path) get a modestly higher ceiling since they're more impressive to solve.
-// Each hint used multiplies the score by 0.8 (a compounding 20% cut).
-function computeScore(optimalWords, wordsUsed, timeMs, hintsUsed){
+// Flip It no longer carries its own penalty — using it just naturally costs
+// you through the word-efficiency term if it adds extra words to your total.
+function computeScore(optimalWords, wordsUsed, timeMs){
   const timeSeconds = timeMs / 1000;
   const efficiency = Math.pow(optimalWords / wordsUsed, 2);       // 1.0 at best, shrinks fast if wasteful
   const speedFactor = 1 / (1 + timeSeconds / 60);                  // gentle time decay, halves per extra minute-ish
   const difficultyMultiplier = 1 + Math.max(0, optimalWords - 2) * 0.1;
-  const hintPenalty = Math.pow(0.8, hintsUsed || 0);
-  const raw = 10000 * efficiency * speedFactor * difficultyMultiplier * hintPenalty;
+  const raw = 10000 * efficiency * speedFactor * difficultyMultiplier;
   return Math.max(0, Math.round(raw));
 }
 
@@ -664,16 +665,20 @@ let state = {
   mode: "random",
   start: "bird",
   target: "word",
+  puzzleStart: "bird",   // the puzzle's original start (restart reverts flips back to this)
+  puzzleTarget: "word",  // the puzzle's original target
   shortest: 2,
   label: null,
-  chain: [],       // submitted words after start, in order
+  chain: [],       // submitted words after start, in order (since the last flip)
   current: "",     // letters currently being typed
   solved: false,
   startTime: null,
   elapsedMs: 0,
   timerHandle: null,
-  hintsUsed: 0,
-  hintsShown: []   // words already revealed as hints this puzzle
+  prefill: [],     // words from before a flip, pinned in from the target end —
+                   // already-proven adjacent all the way to state.target, so
+                   // reaching prefill[0] auto-completes the rest.
+  flipsUsed: 0
 };
 
 const boardEl = document.getElementById("board");
@@ -687,52 +692,40 @@ const difficultyWrap = document.getElementById("difficultyWrap");
 const curatedWrap = document.getElementById("curatedWrap");
 const statsHeading = document.getElementById("statsHeading");
 const puzzleLabelEl = document.getElementById("puzzleLabel");
-const hintBtn = document.getElementById("hintBtn");
-const hintTextEl = document.getElementById("hintText");
 
-// ---------- Hints ----------
-// A hint reveals a word that's one letter away from the TARGET (a graph
-// neighbor of the target) — a suggestion for what your second-to-last word
-// could look like, without giving away the whole path. Each use costs score.
-function hintCandidates(){
-  const neighbors = graph[state.target] || [];
-  return neighbors.filter(w =>
-    !state.hintsShown.includes(w) &&
-    !state.chain.includes(w) &&
-    w !== state.start
-  );
-}
-
-function useHint(){
+// ---------- Flip It ----------
+// Swaps the start and finish word at any point mid-puzzle. Nothing you've
+// typed is thrown away: the old target becomes the new (locked) start, the
+// old start becomes the new (locked) target, and the two things you'd built
+// up swap roles right along with them — whatever was pinned "already used"
+// near the old target (state.prefill) becomes your fresh, freely-editable
+// chain right after the new start, and whatever you'd freely typed so far
+// (state.chain) becomes newly pinned near the new target. You only have to
+// type your way down until you land on the nearest pinned word — reaching
+// it auto-completes the rest, since that tail was already proven to connect
+// all the way through. Composable across repeated flips. Each flip costs
+// score.
+function flipIt(){
   if(state.solved) return;
-  const candidates = hintCandidates();
-  if(candidates.length === 0){
-    hintTextEl.textContent = state.hintsShown.length
-      ? "No more hints available for this puzzle."
-      : "No hints available for this word.";
-    updateHintButtonState();
-    return;
-  }
-  const hintWord = pickRandom(candidates);
-  state.hintsShown.push(hintWord);
-  state.hintsUsed += 1;
-  renderHintText();
-  updateHintButtonState();
+  const oldStart = state.start;
+  const oldTarget = state.target;
+  const oldChain = state.chain;
+  const oldPrefill = state.prefill;
+
+  state.start = oldTarget;
+  state.target = oldStart;
+  state.chain = oldPrefill.slice().reverse();
+  state.prefill = oldChain.slice().reverse();
+  state.current = "";
+  state.flipsUsed += 1;
+  render();
+  showMessage(`Flipped! Now go from ${state.start.toUpperCase()} to ${state.target.toUpperCase()}.`);
 }
 
-function renderHintText(){
-  if(state.hintsShown.length === 0){
-    hintTextEl.textContent = "";
-    return;
-  }
-  const latest = state.hintsShown[state.hintsShown.length - 1];
-  hintTextEl.innerHTML = `Try a word like <b>${latest.toUpperCase()}</b> right before ${state.target.toUpperCase()}.`
-    + (state.hintsUsed > 1 ? ` (${state.hintsUsed} hints used)` : "");
-}
-
-function updateHintButtonState(){
-  if(!hintBtn) return;
-  hintBtn.disabled = state.solved || hintCandidates().length === 0;
+function updateFlipButtonState(){
+  const flipBtn = document.getElementById("flipBtn");
+  if(!flipBtn) return;
+  flipBtn.disabled = state.solved;
 }
 
 function diffLetterIndex(a, b){
@@ -769,13 +762,29 @@ function render(){
     boardEl.appendChild(makeRow(letters, "active", -1, state.target));
   }
 
+  // prefilled rows from an earlier Flip It — already proven to connect all
+  // the way to the target, pinned in from below. Reach prefill[0] and the
+  // rest completes automatically.
+  if(!state.solved && state.prefill.length){
+    const label = document.createElement("div");
+    label.className = "prefill-label";
+    label.textContent = "Already used — connect here ↓";
+    boardEl.appendChild(label);
+    state.prefill.forEach((word, idx) => {
+      const prev = idx===0 ? null : state.prefill[idx-1];
+      const changedIdx = prev ? diffLetterIndex(prev, word) : -1;
+      const row = makeRow(word.split(""), "prefilled", changedIdx, state.target);
+      boardEl.appendChild(row);
+    });
+  }
+
   // target row (locked) — only show if not yet reached
   if(!state.solved){
     boardEl.appendChild(makeRow(state.target.split(""), "locked-target"));
   }
 
-  wordCountEl.textContent = state.chain.length;
-  updateHintButtonState();
+  wordCountEl.textContent = state.chain.length + state.prefill.length;
+  updateFlipButtonState();
 }
 
 function makeRow(letters, cls, changedIdx, target){
@@ -804,8 +813,7 @@ function showMessage(msg){
 }
 
 function shakeActiveRow(){
-  const rows = boardEl.querySelectorAll(".row");
-  const active = rows[rows.length - (state.solved?1:2)];
+  const active = boardEl.querySelector(".row.active");
   if(active){
     active.classList.add("shake");
     setTimeout(()=>active.classList.remove("shake"), 350);
@@ -872,6 +880,19 @@ function submitWord(){
   state.chain.push(word);
   state.current = "";
 
+  // Reconnecting to a pinned "prefill" word (from an earlier Flip It) means
+  // the rest of that tail — already proven adjacent all the way to the
+  // target — completes automatically.
+  if(state.prefill.length && word === state.prefill[0]){
+    state.chain = state.chain.concat(state.prefill.slice(1), [state.target]);
+    state.prefill = [];
+    state.solved = true;
+    stopTimer();
+    render();
+    setTimeout(showResults, 250);
+    return;
+  }
+
   if(word === state.target){
     state.solved = true;
     stopTimer();
@@ -883,25 +904,18 @@ function submitWord(){
   render();
 }
 
-function undoMove(){
-  if(state.solved) return;
-  if(state.chain.length){
-    state.chain.pop();
-    render();
-  }
-}
-
 function restartPuzzle(){
   stopTimer();
+  state.start = state.puzzleStart;
+  state.target = state.puzzleTarget;
   state.chain = [];
   state.current = "";
   state.solved = false;
   state.elapsedMs = 0;
-  state.hintsUsed = 0;
-  state.hintsShown = [];
+  state.prefill = [];
+  state.flipsUsed = 0;
   timerEl.textContent = "00:00.0";
   render();
-  renderHintText();
   startTimer();
 }
 
@@ -928,17 +942,18 @@ function newPuzzle(){
   }
   state.start = p.start;
   state.target = p.end;
+  state.puzzleStart = p.start;
+  state.puzzleTarget = p.end;
   state.shortest = p.shortest;
   state.label = p.label;
   state.chain = [];
   state.current = "";
   state.solved = false;
   state.elapsedMs = 0;
-  state.hintsUsed = 0;
-  state.hintsShown = [];
+  state.prefill = [];
+  state.flipsUsed = 0;
   timerEl.textContent = "00:00.0";
   render();
-  renderHintText();
   updatePuzzleLabel();
   updateStatsPanel();
   startTimer();
@@ -1065,13 +1080,14 @@ function updateStatsPanel(){
 
 // ---------- Results modal ----------
 function showResults(){
-  const score = computeScore(state.shortest, state.chain.length, state.elapsedMs, state.hintsUsed);
+  const totalWords = state.chain.length + state.prefill.length;
+  const score = computeScore(state.shortest, totalWords, state.elapsedMs);
   document.getElementById("resScore").textContent = score.toLocaleString();
   document.getElementById("resTime").textContent = fmtTime(state.elapsedMs);
-  document.getElementById("resWords").textContent = state.chain.length;
-  document.getElementById("resHints").textContent = state.hintsUsed;
+  document.getElementById("resWords").textContent = totalWords;
+  document.getElementById("resFlips").textContent = state.flipsUsed;
   document.getElementById("resBest").textContent = state.shortest + " word" + (state.shortest===1?"":"s");
-  recordResult(state.tier, state.elapsedMs, state.chain.length, score);
+  recordResult(state.tier, state.elapsedMs, totalWords, score);
   updateStatsPanel();
 
   // Reset the "show me the optimal path" reveal for this fresh result.
@@ -1128,8 +1144,7 @@ document.getElementById("shortestRow").onclick = withBlur(toggleShortestPath);
 // ---------- Wire up controls ----------
 document.getElementById("newPuzzleBtn").onclick = withBlur(newPuzzle);
 document.getElementById("restartBtn").onclick = withBlur(restartPuzzle);
-document.getElementById("undoBtn").onclick = withBlur(undoMove);
-hintBtn.onclick = withBlur(useHint);
+document.getElementById("flipBtn").onclick = withBlur(flipIt);
 
 function populateCuratedSelect(){
   curatedSel.innerHTML = "";
