@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About — BIRD2WORD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fafafa;
+    --panel:#ffffff;
+    --border:#d3d6da;
+    --text:#1a1a1b;
+    --muted:#787c7e;
+    --accent:#3a7ca5;
+    --changed:#f4c430;
+    --match:#4a90e2;
+    --solved:#6aaa64;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 60px;
+  }
+  .wrap{ width:100%; max-width:560px; }
+  header{
+    text-align:center;
+    border-bottom:1px solid var(--border);
+    padding-bottom:14px;
+    margin-bottom:20px;
+  }
+  .logo-lockup{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .wordmark{
+    font-size:1.9rem;
+    font-weight:800;
+    letter-spacing:-0.02em;
+  }
+  .wordmark .two{ color:var(--changed); }
+  .wordmark .w-bird{ color:var(--match); }
+  .wordmark .w-word{ color:var(--solved); }
+  .beta-badge{
+    font-family:'Permanent Marker', cursive;
+    font-size:1.05rem;
+    color:#000;
+    transform:rotate(-8deg);
+    line-height:1;
+  }
+  .tagline{
+    margin:6px 0 0;
+    font-size:0.85rem;
+    font-weight:600;
+    color:var(--accent);
+  }
+  h2{
+    font-size:1.05rem;
+    margin:28px 0 8px;
+    border-left:4px solid var(--accent);
+    padding-left:10px;
+  }
+  p, li{
+    font-size:0.92rem;
+    line-height:1.55;
+    color:var(--text);
+  }
+  ul{ margin:6px 0; padding-left:22px; }
+  li{ margin-bottom:8px; }
+  .example{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    margin:14px 0;
+    flex-wrap:wrap;
+  }
+  .example .tile{
+    width:52px;
+    height:52px;
+    border:2px solid var(--border);
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.3rem;
+    font-weight:700;
+    text-transform:uppercase;
+    background:var(--panel);
+  }
+  .example .step{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .example .arrow{
+    color:var(--muted);
+    font-size:1.1rem;
+    align-self:center;
+  }
+  .highlight{ color:var(--match); }
+  .highlight2{ color:var(--changed-text, #1a1a1b); background:var(--changed); border-radius:3px; padding:0 2px; }
+  .highlight3{ color:#fff; background:var(--solved); border-radius:3px; padding:0 2px; }
+  .back-link{
+    display:inline-block;
+    margin-top:32px;
+    font-size:0.9rem;
+    color:#fff;
+    background:var(--accent);
+    padding:10px 20px;
+    border-radius:6px;
+    text-decoration:none;
+    font-weight:600;
+  }
+  .back-link:hover{ background:#316a8f; }
+  .back-wrap{ text-align:center; }
+  footer{
+    margin-top:36px;
+    font-size:0.72rem;
+    color:var(--muted);
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo-lockup">
+      <span class="wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
+      <span class="beta-badge">BETA</span>
+    </div>
+    <p class="tagline">Swift Words, Sharp Minds.</p>
+  </header>
+
+  <h2>What is BIRD2WORD?</h2>
+  <p>BIRD2WORD is a word ladder game. You're given a start word and a target word, both four letters long. Your job is to turn one into the other by changing exactly one letter at a time — and every step along the way has to be a real word.</p>
+
+  <h2>A quick example</h2>
+  <p>To go from BIRD to WORD, one path looks like this:</p>
+  <div class="example">
+    <div class="step">
+      <div class="tile">B</div><div class="tile">I</div><div class="tile">R</div><div class="tile">D</div>
+    </div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">
+      <div class="tile">B</div><div class="tile">A</div><div class="tile">R</div><div class="tile">D</div>
+    </div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">
+      <div class="tile">W</div><div class="tile">A</div><div class="tile">R</div><div class="tile">D</div>
+    </div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">
+      <div class="tile">W</div><div class="tile">O</div><div class="tile">R</div><div class="tile">D</div>
+    </div>
+  </div>
+  <p>Each word differs from the one before it by a single letter. That's the whole game — simple to learn, but the shortest path isn't always obvious.</p>
+
+  <h2>How to play</h2>
+  <ul>
+    <li><b>Type your guess.</b> On desktop, just type on your keyboard. On a phone, tap the puzzle board and your keyboard will pop up.</li>
+    <li><b>Press Enter</b> to submit a word. If it's a real word and only one letter away from your last word, it gets added to your chain.</li>
+    <li><b>Tile colors</b> give you feedback: blue means that letter matches the target word, yellow means that's the letter you just changed.</li>
+    <li><b>Backing up</b> is easy — just retype a word you already used (or the start word) and your chain rewinds to that point, no penalty.</li>
+  </ul>
+
+  <h2>Modes</h2>
+  <ul>
+    <li><b>Random by Difficulty</b> — Easy, Medium, or Hard puzzles, pulled at random from a dictionary of nearly 5,000 four-letter words.</li>
+    <li><b>Fun Word Pairs</b> — a curated set of especially fun or clever start/target pairs.</li>
+  </ul>
+
+  <h2>Flip It</h2>
+  <p>Stuck, or just want a change of pace? Hit <b>Flip It</b> at any time to swap your start and target words. Nothing you've already solved is lost — the words you've used simply reappear on the board from the other end, already filled in. You just need to build a path until you connect to them. Flip as many times as you like.</p>
+
+  <h2>Mercy</h2>
+  <p>If you want to give up on a puzzle, hit <b>Mercy!</b> and confirm. The rest of the path will be filled in for you so you can see how it plays out. Give-ups don't count toward your stats or score — they're just there so you're never stuck.</p>
+
+  <h2>Scoring</h2>
+  <p>Your score rewards solving a puzzle in as few words as possible, and rewards speed too — though word-efficiency matters more than time. Harder puzzles (ones with a longer shortest path) score higher. After you solve a puzzle, you can also tap "Shortest possible" in the results to reveal one example of the most efficient path.</p>
+
+  <h2>Stats</h2>
+  <p>Your average and best time, word count, and score are tracked separately for each mode and difficulty, right in your browser. They stay on your device and aren't shared anywhere.</p>
+
+  <div class="back-wrap">
+    <a class="back-link" href="index.html">&larr; Back to the game</a>
+  </div>
+</div>
+<footer>BIRD2WORD — a word ladder game.</footer>
+</body>
+</html>
