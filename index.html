@@ -1132,9 +1132,22 @@ function handleKey(key){
   } else if(/^[a-zA-Z]$/.test(key)){
     if(state.current.length < 4){
       state.current += key.toLowerCase();
-      render();
+      if(!autoSubmitIfTarget()) render();
     }
   }
+}
+
+// If the player has just typed a full 4-letter word that exactly matches
+// the current target, there's no ambiguity left to wait on — submit it
+// immediately instead of requiring an explicit Enter press. Returns true
+// if it auto-submitted (so callers can skip their own render() call, since
+// submitWord() already renders).
+function autoSubmitIfTarget(){
+  if(state.current.length === 4 && state.current === state.target.toLowerCase()){
+    submitWord();
+    return true;
+  }
+  return false;
 }
 
 document.addEventListener("keydown", (e)=>{
@@ -1171,7 +1184,7 @@ mobileInputEl.addEventListener("input", () => {
     return;
   }
   state.current = mobileInputEl.value.replace(/[^a-zA-Z]/g, "").slice(0,4).toLowerCase();
-  render();
+  if(!autoSubmitIfTarget()) render();
 });
 mobileInputEl.addEventListener("keydown", (e) => {
   // Letters and Backspace are handled by the "input" listener above via
