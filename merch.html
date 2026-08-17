@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merch — BIRD2WORD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fafafa;
+    --panel:#ffffff;
+    --border:#d3d6da;
+    --text:#1a1a1b;
+    --muted:#787c7e;
+    --accent:#3a7ca5;
+    --changed:#f4c430;
+    --changed-text:#1a1a1b;
+    --match:#4a90e2;
+    --match-text:#ffffff;
+    --solved:#6aaa64;
+    --solved-text:#ffffff;
+    --error:#d93636;
+    --radius:8px;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100vh;
+    padding:16px;
+  }
+  header{
+    width:100%;
+    max-width:960px;
+    text-align:center;
+    border-bottom:1px solid var(--border);
+    padding-bottom:12px;
+    margin-bottom:18px;
+  }
+  .logo-lockup{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .wordmark{
+    font-size:1.9rem;
+    font-weight:800;
+    letter-spacing:-0.02em;
+  }
+  .wordmark .two{ color:var(--changed); }
+  .wordmark .w-bird{ color:var(--match); }
+  .wordmark .w-word{ color:var(--solved); }
+  .beta-badge{
+    font-family:'Permanent Marker', cursive;
+    font-size:1.05rem;
+    color:#000;
+    transform:rotate(-8deg);
+    line-height:1;
+  }
+  .tagline{
+    margin:6px 0 2px;
+    font-size:0.85rem;
+    font-weight:600;
+    color:var(--accent);
+  }
+  .page-title{
+    margin:2px 0 0;
+    color:var(--muted);
+    font-size:0.78rem;
+  }
+
+  main{ width:100%; max-width:960px; }
+
+  .preview-banner{
+    background:#fff8ea;
+    border:1px solid #e9d8a6;
+    color:#8a6d1d;
+    border-radius:var(--radius);
+    padding:10px 14px;
+    font-size:0.82rem;
+    text-align:center;
+    margin-bottom:10px;
+  }
+  .intro-copy{
+    text-align:center;
+    font-size:0.88rem;
+    color:var(--muted);
+    margin:0 0 24px;
+    line-height:1.55;
+    max-width:660px;
+    margin-left:auto;
+    margin-right:auto;
+  }
+  .intro-copy a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  .intro-copy a:hover{ text-decoration:underline; }
+
+  .product-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+    gap:18px;
+    margin-bottom:32px;
+  }
+
+  .product-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    position:relative;
+  }
+  .preview-pill{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:#eef2f5;
+    color:var(--muted);
+    font-size:0.62rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding:3px 8px;
+    border-radius:20px;
+  }
+  .cat-tag{
+    align-self:flex-start;
+    font-size:0.68rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:var(--accent);
+    margin-bottom:10px;
+  }
+
+  .mock-stage{
+    width:100%;
+    min-height:220px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:12px;
+  }
+
+  /* --- Shared solved-board rendering (used inside both mockups) --- */
+  .board-mount{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+  }
+  .board-row{ display:flex; gap:3px; }
+  .board-row .tile{
+    border:1.5px solid var(--border);
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    text-transform:uppercase;
+    background:#fff;
+    color:var(--text);
+  }
+  .board-row.start .tile{ background:#eef2f5; border-color:#c7ccd1; }
+  .board-row.final .tile{ background:var(--solved); border-color:var(--solved); color:var(--solved-text); }
+  .board-row.mid .tile.match{ background:var(--match); border-color:var(--match); color:var(--match-text); }
+  .board-row.mid .tile.changed{ background:var(--changed); border-color:var(--changed); color:var(--changed-text); }
+
+  /* --- Sticker mockup: rectangular, solved board + small script wordmark --- */
+  .sticker-shape{
+    width:190px;
+    background:#fff;
+    border-radius:14px;
+    border:6px solid #fff;
+    box-shadow:0 0 0 2px var(--border), 0 6px 14px rgba(0,0,0,0.08);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    padding:14px 10px;
+  }
+  .sticker-script{
+    font-weight:800;
+    font-size:0.85rem;
+    letter-spacing:-0.01em;
+  }
+  .sticker-script .two{ color:var(--changed); }
+  .sticker-script .w-bird{ color:var(--match); }
+  .sticker-script .w-word{ color:var(--solved); }
+
+  /* --- Shirt mockup (front & back) --- */
+  .shirt-mock{
+    position:relative;
+    width:200px;
+    height:210px;
+  }
+  .shirt-mock svg{ width:100%; height:100%; }
+  .shirt-print{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -44%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+  .tee-wordmark{
+    font-size:0.9rem;
+    font-weight:800;
+    letter-spacing:-0.01em;
+  }
+  .tee-wordmark .two{ color:var(--changed); }
+  .tee-wordmark .w-bird{ color:var(--match); }
+  .tee-wordmark .w-word{ color:var(--solved); }
+  .back-print .board-mount{ margin-bottom:2px; }
+
+  .view-toggle{
+    display:flex;
+    gap:5px;
+    margin-bottom:8px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .toggle-btn{
+    font-family:inherit;
+    font-size:0.7rem;
+    font-weight:600;
+    padding:5px 11px;
+    border-radius:20px;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .toggle-btn.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+
+  .product-label{
+    font-size:0.95rem;
+    font-weight:700;
+    margin-bottom:8px;
+    text-align:center;
+  }
+
+  .chain-note{
+    font-size:0.7rem;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  .teaser-box{
+    background:var(--panel);
+    border:1px dashed var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    text-align:center;
+    margin-bottom:24px;
+  }
+  .teaser-box h2{
+    font-size:0.95rem;
+    margin:0 0 6px;
+  }
+  .teaser-box p{
+    font-size:0.82rem;
+    color:var(--muted);
+    margin:0;
+    line-height:1.5;
+  }
+  .teaser-box a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  .teaser-box a:hover{ text-decoration:underline; }
+
+  .nav-links{
+    text-align:center;
+    margin-top:8px;
+    font-size:0.85rem;
+  }
+  .nav-links a{
+    color:var(--accent);
+    text-decoration:none;
+    font-weight:600;
+    margin:0 8px;
+  }
+  .nav-links a:hover{ text-decoration:underline; }
+
+  footer{
+    margin-top:28px;
+    font-size:0.72rem;
+    color:var(--muted);
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-lockup">
+    <span class="wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
+    <span class="beta-badge">BETA</span>
+  </div>
+  <p class="tagline">Swift Words, Sharp Minds.</p>
+  <p class="page-title">Merch</p>
+</header>
+
+<main>
+  <div class="preview-banner">Design preview — nothing on this page is for sale yet.</div>
+  <p class="intro-copy">A first look at BIRD2WORD stickers and shirts, each one showing an actual solved puzzle from the game's Fun Word Pairs — same colored tiles you'd see on the board. Stickers show the solve with the BIRD2WORD script underneath; shirts wear the logo up front and the solved puzzle on the back.</p>
+
+  <div class="product-grid" id="productGrid"></div>
+
+  <div class="teaser-box">
+    <h2>Coming next: design your own</h2>
+    <p>Eventually you'll be able to turn any puzzle you build in the <a href="playground.html">Playground</a> into your own custom sticker or shirt. For now, enjoy the preview above.</p>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html">Play the game</a>
+    <a href="about.html">About</a>
+    <a href="playground.html">Playground</a>
+  </div>
+</main>
+
+<footer>BIRD2WORD — a word ladder game.</footer>
+
+<script>
+// A hand-picked slice of the game's curated Fun Word Pairs, each with its
+// verified shortest solution chain (computed offline the same way the game
+// itself would via bfsShortestPath over the puzzle graph). Unlike an
+// earlier version of this page, the product art now shows the *actual*
+// solved board — same tile-by-tile coloring as real gameplay — rather than
+// just the bold start/target words, so it reads as "a puzzle someone
+// really solved" instead of a generic word-pair graphic.
+const PRODUCTS = [
+  { label:"Bird → Word", cat:"Classic", chain:["bird","bord","word"] },
+  { label:"Warm → Cold", cat:"Antonym", chain:["warm","ward","card","cord","cold"] },
+  { label:"Love → Hate", cat:"Antonym", chain:["love","hove","have","hate"] },
+  { label:"Wild → Tame", cat:"Antonym", chain:["wild","wile","tile","tale","tame"] },
+  { label:"Fire → Rain", cat:"Elements", chain:["fire","dire","dare","darn","dain","rain"] },
+  { label:"Moon → Star", cat:"Nature", chain:["moon","boon","boor","boar","soar","star"] },
+  { label:"Rise → Fall", cat:"Antonym", chain:["rise","fise","file","fill","fall"] },
+  { label:"Give → Take", cat:"Antonym", chain:["give","gave","tave","take"] },
+  { label:"East → West", cat:"Direction", chain:["east","wast","west"] },
+  { label:"Wolf → Bear", cat:"Animals", chain:["wolf","wold","bold","beld","bead","bear"] }
+];
+
+const SHIRT_SVG = `
+  <svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M62,42 L98,22 Q120,10 142,22 L178,42 L222,74 L192,104 L178,88 L178,224
+      Q178,234 168,234 L72,234 Q62,234 62,224 L62,88 L48,104 L18,74 Z"
+      fill="#f3f4f5" stroke="#c7ccd1" stroke-width="3" stroke-linejoin="round"/>
+  </svg>
+`;
+
+// Scale tile size down as the ladder gets longer, so every mockup's board
+// occupies roughly the same footprint whether it's a 3-word or 6-word solve.
+function tileSizeForRows(n){
+  return Math.max(16, Math.min(34, Math.round(148 / n) - 4));
+}
+
+// Renders a full solved word ladder as stacked tile rows, colored the same
+// way the game's intro animation does it: the start row is a plain
+// "locked" gray, middle rows highlight each letter that already matches
+// the target (blue) or that just changed from the previous word (yellow),
+// and the final row is a clean solid green — no per-letter blue/green
+// clash, unlike the main board's real (slightly buggy) final-row styling.
+function buildBoard(chain, target){
+  const tileSize = tileSizeForRows(chain.length);
+  const mount = document.createElement("div");
+  mount.className = "board-mount";
+  for(let i=0;i<chain.length;i++){
+    const word = chain[i];
+    const prev = i > 0 ? chain[i-1] : null;
+    const isStart = i === 0;
+    const isFinal = i === chain.length - 1;
+    const row = document.createElement("div");
+    row.className = "board-row" + (isStart ? " start" : isFinal ? " final" : " mid");
+    for(let c=0;c<word.length;c++){
+      const tile = document.createElement("div");
+      let cls = "tile";
+      if(!isStart && !isFinal){
+        if(word[c] === target[c]) cls += " match";
+        else if(prev && word[c] !== prev[c]) cls += " changed";
+      }
+      tile.className = cls;
+      tile.style.width = tileSize + "px";
+      tile.style.height = tileSize + "px";
+      tile.style.fontSize = Math.round(tileSize * 0.42) + "px";
+      tile.textContent = word[c];
+      row.appendChild(tile);
+    }
+    mount.appendChild(row);
+  }
+  return mount;
+}
+
+function buildCard(p){
+  const card = document.createElement("div");
+  card.className = "product-card";
+  const target = p.chain[p.chain.length - 1];
+
+  card.innerHTML = `
+    <div class="preview-pill">Preview</div>
+    <div class="cat-tag">${p.cat}</div>
+    <div class="product-label">${p.label}</div>
+    <div class="mock-stage">
+      <div class="mock sticker-mock">
+        <div class="sticker-shape">
+          <div class="sticker-board"></div>
+          <div class="sticker-script"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></div>
+        </div>
+      </div>
+      <div class="mock shirt-front-mock" hidden>
+        ${SHIRT_SVG}
+        <div class="shirt-print">
+          <span class="tee-wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
+        </div>
+      </div>
+      <div class="mock shirt-back-mock" hidden>
+        ${SHIRT_SVG}
+        <div class="shirt-print back-print"></div>
+      </div>
+    </div>
+    <div class="view-toggle">
+      <button class="toggle-btn active" data-view="sticker">Sticker</button>
+      <button class="toggle-btn" data-view="front">Shirt Front</button>
+      <button class="toggle-btn" data-view="back">Shirt Back</button>
+    </div>
+    <div class="chain-note">${p.chain.length} words &middot; shortest possible</div>
+  `;
+
+  card.querySelector(".sticker-board").appendChild(buildBoard(p.chain, target));
+  card.querySelector(".back-print").appendChild(buildBoard(p.chain, target));
+
+  const stickerEl = card.querySelector(".sticker-mock");
+  const frontEl = card.querySelector(".shirt-front-mock");
+  const backEl = card.querySelector(".shirt-back-mock");
+  const toggleBtns = card.querySelectorAll(".toggle-btn");
+  toggleBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      toggleBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const view = btn.dataset.view;
+      stickerEl.hidden = view !== "sticker";
+      frontEl.hidden = view !== "front";
+      backEl.hidden = view !== "back";
+    });
+  });
+
+  return card;
+}
+
+const grid = document.getElementById("productGrid");
+PRODUCTS.forEach(p => grid.appendChild(buildCard(p)));
+</script>
+</body>
+</html>
