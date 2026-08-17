@@ -107,6 +107,8 @@
     font-size:1.1rem;
     align-self:center;
   }
+  p a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  p a:hover{ text-decoration:underline; }
   .highlight{ color:var(--match); }
   .highlight2{ color:var(--changed-text, #1a1a1b); background:var(--changed); border-radius:3px; padding:0 2px; }
   .highlight3{ color:#fff; background:var(--solved); border-radius:3px; padding:0 2px; }
@@ -190,6 +192,9 @@
 
   <h2>Stats</h2>
   <p>Your average and best time, word count, and score are tracked separately for each mode and difficulty, right in your browser. They stay on your device and aren't shared anywhere.</p>
+
+  <h2>Playground</h2>
+  <p>Want to build your own puzzle? Head to the <a href="playground.html">Playground</a> — type in any start and target word (4 or 5 letters) and it'll find the shortest ladder between them, if one exists.</p>
 
   <div class="back-wrap">
     <a class="back-link" href="index.html">&larr; Back to the game</a>
