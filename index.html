@@ -224,8 +224,8 @@
     color:var(--text);
     transition:transform 0.15s ease, background 0.15s ease;
   }
-  .row.locked-start .tile{ background:#eef2f5; border-color:#c7ccd1; }
-  .row.locked-target .tile{ background:#fff8ea; border-color:#e9d8a6; color:#8a6d1d; }
+  .row.locked-start .tile{ background:#e7f1fb; border-color:#a9cbe8; color:#2c5a82; }
+  .row.locked-target .tile{ background:#eef7ec; border-color:#b7dab0; color:#3f6b3a; }
   .row.solved .tile{ background:var(--solved); border-color:var(--solved); color:var(--solved-text); }
   .row.prefilled .tile{ background:#eef7ec; border-color:#b7dab0; color:#3f6b3a; }
   .prefill-label{
@@ -289,7 +289,7 @@
     transition:transform 0.25s cubic-bezier(.34,1.56,.64,1), background 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.2s ease;
   }
   .intro-tile.show{ opacity:1; transform:scale(1); }
-  .intro-tile.locked{ background:#eef2f5; border-color:#c7ccd1; }
+  .intro-tile.locked{ background:#e7f1fb; border-color:#a9cbe8; color:#2c5a82; }
   .intro-tile.changed{ background:var(--changed); border-color:var(--changed); color:var(--changed-text); }
   .intro-tile.match{ background:var(--match); border-color:var(--match); color:var(--match-text); }
   .intro-tile.solved{ background:var(--solved); border-color:var(--solved); color:var(--solved-text); }
@@ -389,6 +389,7 @@
   }
   #overlay.show{ display:flex; }
   #modal{
+    position:relative;
     background:#fff;
     border-radius:10px;
     padding:24px;
@@ -397,6 +398,27 @@
     text-align:center;
   }
   #modal h2{ margin-top:0; margin-bottom:4px; }
+  #modal .modal-close-btn{
+    position:absolute;
+    top:8px;
+    right:10px;
+    background:none;
+    border:none;
+    font-size:1.4rem;
+    line-height:1;
+    color:var(--muted);
+    cursor:pointer;
+    padding:4px 6px;
+    margin:0;
+    width:auto;
+  }
+  .modal-close-btn:hover{ color:var(--text); }
+  .share-btn{
+    background:#fff;
+    border:1px solid var(--accent);
+    color:var(--accent);
+  }
+  .share-btn:hover{ background:#eef4f8; }
   #modal .score-display{
     font-size:2.4rem;
     font-weight:800;
@@ -637,6 +659,7 @@
 
 <div id="overlay">
   <div id="modal">
+    <button type="button" class="modal-close-btn" id="modalCloseBtn" aria-label="Close">&times;</button>
     <h2 id="resultsHeading">Solved!</h2>
     <div class="score-display" id="resScore">0</div>
     <div class="score-label">Score</div>
@@ -649,6 +672,8 @@
       <div class="path-chips" id="shortestPathChips"></div>
       <div class="note">One example of the fewest-word solution</div>
     </div>
+    <button type="button" id="shareTextBtn" class="share-btn">Text a Friend</button>
+    <button type="button" id="shareImageBtn" class="share-btn">Share Screenshot</button>
     <button id="playAgainBtn" class="primary">New Puzzle</button>
   </div>
 </div>
@@ -1449,6 +1474,199 @@ document.getElementById("playAgainBtn").onclick = withBlurAndFocus(()=>{
   newPuzzle();
 });
 document.getElementById("shortestRow").onclick = withBlur(toggleShortestPath);
+
+// Closing the results modal just hides the overlay — the solved board
+// underneath is untouched, so the player can look back over exactly how
+// they solved it (including a completed Flip It board) without it forcing
+// a new puzzle. Same idea as the Mercy panel already not covering the board.
+function closeResultsModal(){
+  document.getElementById("overlay").classList.remove("show");
+}
+document.getElementById("modalCloseBtn").onclick = withBlur(closeResultsModal);
+
+// ---------- Share results (Text a Friend) ----------
+// First pass at sharing: a plain SMS deep link pre-filled with a short
+// summary of the solve. "sms:" URIs need a different separator before the
+// body param on iOS ("&") vs. Android/everything else ("?"), so we sniff
+// the UA for that one branch. No share data leaves the device — this just
+// opens whatever the phone's own Messages app is with the text pre-filled;
+// the player still picks the recipient and hits send themselves.
+function buildShareMessage(){
+  const totalWords = state.chain.length + state.prefill.length;
+  const start = state.puzzleStart.toUpperCase();
+  const target = state.puzzleTarget.toUpperCase();
+  const perfect = totalWords === state.shortest;
+  let msg = `I solved ${start} → ${target} on BIRD2WORD in ${totalWords} word${totalWords === 1 ? "" : "s"}!`;
+  if(perfect) msg += " Fewest possible!";
+  msg += " Can you beat it? bird2word.com";
+  return msg;
+}
+
+function shareViaText(){
+  const encoded = encodeURIComponent(buildShareMessage());
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const url = (isIOS ? "sms:&body=" : "sms:?body=") + encoded;
+  window.location.href = url;
+}
+document.getElementById("shareTextBtn").onclick = withBlur(shareViaText);
+
+// ---------- Share results (Screenshot) ----------
+// Draws a shareable image of the solved board from scratch on a <canvas> —
+// not an actual screen-capture, but a purpose-built recreation so it looks
+// clean regardless of device/zoom. Tile colors deliberately reuse the exact
+// same rules as the live board (see makeRow()/the CSS above), including the
+// per-letter "match" priority — so the image matches what the player really
+// saw, quirks and all, rather than a prettied-up alternate version.
+function roundRectPath(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function tileColorsFor(letter, pos, target, changedIdx, isStartRow){
+  if(letter === target[pos]) return { bg:"#4a90e2", border:"#4a90e2", text:"#ffffff" };
+  if(pos === changedIdx) return { bg:"#f4c430", border:"#f4c430", text:"#1a1a1b" };
+  if(isStartRow) return { bg:"#e7f1fb", border:"#a9cbe8", text:"#2c5a82" };
+  return { bg:"#ffffff", border:"#d3d6da", text:"#1a1a1b" };
+}
+
+function buildResultCanvas(){
+  const rows = [state.start, ...state.chain];
+  const target = state.target;
+  const wordLen = state.start.length;
+  const totalWords = state.chain.length + state.prefill.length;
+  const perfect = totalWords === state.shortest;
+  const score = computeScore(state.shortest, totalWords, state.elapsedMs);
+
+  const FONT = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+  const scale = 2; // draw at 2x for a crisp image on high-DPI screens
+  const tile = 54, gap = 6, pad = 28;
+  const boardW = wordLen * tile + (wordLen - 1) * gap;
+  const boardH = rows.length * tile + (rows.length - 1) * gap;
+  const headerH = 76;
+  const footerH = perfect ? 84 : 64;
+  const cw = boardW + pad * 2;
+  const ch = headerH + boardH + footerH;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = cw * scale;
+  canvas.height = ch * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Wordmark, tri-color, centered
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `800 26px ${FONT}`;
+  const parts = [
+    { text:"BIRD", color:"#4a90e2" },
+    { text:"2", color:"#f4c430" },
+    { text:"WORD", color:"#6aaa64" }
+  ];
+  const totalTextW = parts.reduce((sum, p) => sum + ctx.measureText(p.text).width, 0);
+  let tx = (cw - totalTextW) / 2;
+  const wordmarkY = 34;
+  parts.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, tx, wordmarkY);
+    tx += ctx.measureText(p.text).width;
+  });
+
+  ctx.font = `600 12px ${FONT}`;
+  ctx.fillStyle = "#3a7ca5";
+  ctx.textAlign = "center";
+  ctx.fillText("Swift Words, Sharp Minds.", cw / 2, wordmarkY + 20);
+  ctx.textAlign = "left";
+
+  // Board
+  const boardX = pad;
+  const boardY = headerH;
+  rows.forEach((word, rIdx) => {
+    const isStart = rIdx === 0;
+    const prev = isStart ? null : rows[rIdx - 1];
+    const changedIdx = prev ? diffLetterIndex(prev, word) : -1;
+    for(let c = 0; c < word.length; c++){
+      const colors = tileColorsFor(word[c], c, target, changedIdx, isStart);
+      const x = boardX + c * (tile + gap);
+      const y = boardY + rIdx * (tile + gap);
+      roundRectPath(ctx, x, y, tile, tile, 8);
+      ctx.fillStyle = colors.bg;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = colors.border;
+      ctx.stroke();
+      ctx.fillStyle = colors.text;
+      ctx.font = `700 24px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(word[c].toUpperCase(), x + tile / 2, y + tile / 2 + 2);
+    }
+  });
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  // Footer stats
+  const footerTop = boardY + boardH + 24;
+  ctx.textAlign = "center";
+  ctx.font = `700 15px ${FONT}`;
+  ctx.fillStyle = "#1a1a1b";
+  ctx.fillText(`${totalWords} word${totalWords === 1 ? "" : "s"} · ${score.toLocaleString()} points`, cw / 2, footerTop);
+
+  let urlY = footerTop + 20;
+  if(perfect){
+    ctx.font = `700 12px ${FONT}`;
+    ctx.fillStyle = "#3f6b3a";
+    ctx.fillText("Fewest words possible!", cw / 2, urlY);
+    urlY += 18;
+  }
+  ctx.font = `600 12px ${FONT}`;
+  ctx.fillStyle = "#787c7e";
+  ctx.fillText("bird2word.com", cw / 2, urlY);
+  ctx.textAlign = "left";
+
+  return canvas;
+}
+
+function shareScreenshot(){
+  const canvas = buildResultCanvas();
+  canvas.toBlob(async (blob) => {
+    if(!blob) return;
+    const filename = `bird2word-${state.start}-${state.target}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+
+    // On phones/newer browsers, hand the image straight to the native share
+    // sheet (Messages, Photos, whatever the player picks) via the Web Share
+    // API — this is the real "share a screenshot" experience. Anywhere that
+    // isn't supported (most desktop browsers) falls back to just downloading
+    // the PNG so the player can attach it themselves.
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      try{
+        await navigator.share({ files:[file], title:"BIRD2WORD", text: buildShareMessage() });
+      }catch(err){
+        // AbortError just means the player closed the share sheet — not a
+        // real failure, nothing to do.
+      }
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+}
+document.getElementById("shareImageBtn").onclick = withBlur(shareScreenshot);
 
 // ---------- Wire up controls ----------
 document.getElementById("newPuzzleBtn").onclick = withBlurAndFocus(newPuzzle);
