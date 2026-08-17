@@ -424,6 +424,21 @@
   #modal .row-result.clickable span:last-child{ color:var(--accent); font-weight:600; }
   #modal .row-result .chevron{ display:inline-block; margin-left:4px; font-size:0.75em; transition:transform 0.15s ease; }
   #modal .row-result.open .chevron{ transform:rotate(90deg); }
+  .perfect-badge{
+    display:none;
+    margin:2px 0 12px;
+    padding:7px 10px;
+    background:#eef7ec;
+    border:1px solid #b7dab0;
+    border-radius:6px;
+    color:#2f6b3a;
+    font-size:0.78rem;
+    font-weight:700;
+    text-align:center;
+  }
+  .perfect-badge.show{ display:block; }
+  #shortestRow.perfect{ background:#eef7ec; border-radius:6px; }
+  #shortestRow.perfect span:last-child{ color:var(--solved); }
   #shortestPathReveal{
     display:none;
     padding:10px 2px 4px;
@@ -625,6 +640,7 @@
     <h2 id="resultsHeading">Solved!</h2>
     <div class="score-display" id="resScore">0</div>
     <div class="score-label">Score</div>
+    <div class="perfect-badge" id="perfectBadge">Perfect! Solved in the fewest words possible.</div>
     <div class="row-result"><span>Your time</span><span id="resTime"></span></div>
     <div class="row-result"><span>Words used</span><span id="resWords"></span></div>
     <div class="row-result"><span>Flips used</span><span id="resFlips"></span></div>
@@ -1282,23 +1298,23 @@ function launchConfetti(){
 
   const colors = ["#4a90e2", "#f4c430", "#6aaa64"]; // blue, yellow, green
   const pieces = [];
-  const count = 150;
+  const count = 170;
   for(let i=0;i<count;i++){
     pieces.push({
       x: Math.random() * canvas.width,
-      y: -20 - Math.random() * canvas.height * 0.4,
+      y: -20 - Math.random() * canvas.height * 0.6,
       w: 6 + Math.random() * 6,
       h: 8 + Math.random() * 8,
       color: colors[i % colors.length],
-      vy: 2.5 + Math.random() * 3,
-      vx: -1.8 + Math.random() * 3.6,
+      vy: 1.4 + Math.random() * 2,
+      vx: -1.6 + Math.random() * 3.2,
       rotation: Math.random() * 360,
-      vr: -10 + Math.random() * 20
+      vr: -9 + Math.random() * 18
     });
   }
 
   const startTime = performance.now();
-  const maxDuration = 2800;
+  const maxDuration = 5500;
 
   function frame(now){
     const elapsed = now - startTime;
@@ -1307,7 +1323,7 @@ function launchConfetti(){
     for(const p of pieces){
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.035;
+      p.vy += 0.018;
       p.rotation += p.vr;
       if(p.y < canvas.height + 20) stillFalling = true;
       ctx.save();
@@ -1339,10 +1355,14 @@ function showResults(){
 
   const totalWords = state.chain.length + state.prefill.length;
 
-  // A perfect, fewest-possible-words solve earns a quick confetti shower.
-  if(totalWords === state.shortest){
+  // A perfect, fewest-possible-words solve earns a confetti shower plus a
+  // called-out badge/highlight so it's clear *why* confetti is falling.
+  const isPerfect = totalWords === state.shortest;
+  if(isPerfect){
     launchConfetti();
   }
+  document.getElementById("perfectBadge").classList.toggle("show", isPerfect);
+  document.getElementById("shortestRow").classList.toggle("perfect", isPerfect);
 
   const score = computeScore(state.shortest, totalWords, state.elapsedMs);
   document.getElementById("resScore").textContent = score.toLocaleString();
