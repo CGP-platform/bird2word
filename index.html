@@ -630,7 +630,7 @@
   </div>
 </div>
 
-<footer>BIRD2WORD — test build. Dictionary-backed word ladder game. &middot; <a href="about.html">About</a> &middot; <a href="playground.html">Playground</a></footer>
+<footer>BIRD2WORD — test build. Dictionary-backed word ladder game. &middot; <a href="about.html">About</a> &middot; <a href="playground.html">Playground</a> &middot; <a href="merch.html">Merch</a></footer>
 </div>
 
 <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
@@ -1103,7 +1103,8 @@ function restartPuzzle(){
   timerEl.textContent = "00:00.0";
   document.getElementById("mercyPanel").classList.remove("show");
   render();
-  startTimer();
+  // Timer stays at 00:00.0, not running, until the player types their
+  // first letter — see startTimerIfNeeded().
 }
 
 function updatePuzzleLabel(){
@@ -1145,7 +1146,17 @@ function newPuzzle(){
   render();
   updatePuzzleLabel();
   updateStatsPanel();
-  startTimer();
+  // Timer stays at 00:00.0, not running, until the player types their
+  // first letter — see startTimerIfNeeded().
+}
+
+// Starts the timer the first time the player types a letter for this
+// puzzle. Idempotent — safe to call on every keystroke, since it only
+// actually starts anything the first time (state.timerHandle is null).
+function startTimerIfNeeded(){
+  if(state.timerHandle === null && !state.solved){
+    startTimer();
+  }
 }
 
 // ---------- Keyboard input ----------
@@ -1160,6 +1171,7 @@ function handleKey(key){
   } else if(/^[a-zA-Z]$/.test(key)){
     if(state.current.length < 4){
       state.current += key.toLowerCase();
+      startTimerIfNeeded();
       if(!autoSubmitIfTarget()) render();
     }
   }
@@ -1212,6 +1224,7 @@ mobileInputEl.addEventListener("input", () => {
     return;
   }
   state.current = mobileInputEl.value.replace(/[^a-zA-Z]/g, "").slice(0,4).toLowerCase();
+  if(state.current.length > 0) startTimerIfNeeded();
   if(!autoSubmitIfTarget()) render();
 });
 mobileInputEl.addEventListener("keydown", (e) => {
