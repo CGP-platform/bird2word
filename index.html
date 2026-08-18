@@ -672,7 +672,6 @@
       <div class="path-chips" id="shortestPathChips"></div>
       <div class="note">One example of the fewest-word solution</div>
     </div>
-    <button type="button" id="shareTextBtn" class="share-btn">Text a Friend</button>
     <button type="button" id="shareImageBtn" class="share-btn">Share Screenshot</button>
     <button id="playAgainBtn" class="primary">New Puzzle</button>
   </div>
@@ -1133,11 +1132,63 @@ function restartPuzzle(){
 }
 
 function updatePuzzleLabel(){
-  if(state.mode === "curated" && state.label){
+  if(state.mode === "shared"){
+    puzzleLabelEl.innerHTML = `Shared puzzle: <b>${state.puzzleStart.toUpperCase()} → ${state.puzzleTarget.toUpperCase()}</b>`;
+  } else if(state.mode === "curated" && state.label){
     puzzleLabelEl.innerHTML = `Fun pair: <b>${state.label}</b>`;
   } else {
     puzzleLabelEl.textContent = "";
   }
+}
+
+// Builds a URL that, when opened, loads this exact start/target puzzle
+// (used in share text so a friend can play the very puzzle you solved).
+function buildPuzzleURL(start, target){
+  const base = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams({ start, target });
+  return `${base}?${params.toString()}`;
+}
+
+// Reads ?start=&target= from the URL and, if they describe a valid,
+// solvable puzzle, returns { start, end, shortest }. Returns null if the
+// params are missing, malformed, not real words, or unconnected.
+function getSharedPuzzleFromURL(){
+  const params = new URLSearchParams(window.location.search);
+  const start = (params.get("start") || "").toLowerCase().trim();
+  const target = (params.get("target") || "").toLowerCase().trim();
+  if(!/^[a-z]{4}$/.test(start) || !/^[a-z]{4}$/.test(target)) return null;
+  if(start === target) return null;
+  if(!validWordSet.has(start) || !validWordSet.has(target)) return null;
+  if(!(start in graph) || !(target in graph)) return null;
+  const path = bfsShortestPath(start, target);
+  if(!path) return null;
+  return { start, end: target, shortest: path.length - 1, label: null };
+}
+
+// Initializes the board from a shared puzzle (from a URL) instead of
+// generating a random or curated one. Mirrors newPuzzle()'s state reset.
+function loadSharedPuzzle(p){
+  stopTimer();
+  state.mode = "shared";
+  state.tier = "shared";
+  state.start = p.start;
+  state.target = p.end;
+  state.puzzleStart = p.start;
+  state.puzzleTarget = p.end;
+  state.shortest = p.shortest;
+  state.label = null;
+  state.chain = [];
+  state.current = "";
+  state.solved = false;
+  state.elapsedMs = 0;
+  state.prefill = [];
+  state.flipsUsed = 0;
+  state.gaveUp = false;
+  timerEl.textContent = "00:00.0";
+  document.getElementById("mercyPanel").classList.remove("show");
+  render();
+  updatePuzzleLabel();
+  updateStatsPanel();
 }
 
 function newPuzzle(){
@@ -1484,13 +1535,11 @@ function closeResultsModal(){
 }
 document.getElementById("modalCloseBtn").onclick = withBlur(closeResultsModal);
 
-// ---------- Share results (Text a Friend) ----------
-// First pass at sharing: a plain SMS deep link pre-filled with a short
-// summary of the solve. "sms:" URIs need a different separator before the
-// body param on iOS ("&") vs. Android/everything else ("?"), so we sniff
-// the UA for that one branch. No share data leaves the device — this just
-// opens whatever the phone's own Messages app is with the text pre-filled;
-// the player still picks the recipient and hits send themselves.
+// ---------- Share results ----------
+// Builds the caption that accompanies a shared screenshot. The trailing
+// link is puzzle-specific (via buildPuzzleURL) so a friend who opens it
+// lands on the exact same start→target puzzle you just solved, not a
+// random one.
 function buildShareMessage(){
   const totalWords = state.chain.length + state.prefill.length;
   const start = state.puzzleStart.toUpperCase();
@@ -1498,18 +1547,9 @@ function buildShareMessage(){
   const perfect = totalWords === state.shortest;
   let msg = `I solved ${start} → ${target} on BIRD2WORD in ${totalWords} word${totalWords === 1 ? "" : "s"}!`;
   if(perfect) msg += " Fewest possible!";
-  msg += " Can you beat it? bird2word.com";
+  msg += ` Can you beat it? ${buildPuzzleURL(state.puzzleStart, state.puzzleTarget)}`;
   return msg;
 }
-
-function shareViaText(){
-  const encoded = encodeURIComponent(buildShareMessage());
-  const ua = navigator.userAgent || "";
-  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-  const url = (isIOS ? "sms:&body=" : "sms:?body=") + encoded;
-  window.location.href = url;
-}
-document.getElementById("shareTextBtn").onclick = withBlur(shareViaText);
 
 // ---------- Share results (Screenshot) ----------
 // Draws a shareable image of the solved board from scratch on a <canvas> —
@@ -1713,7 +1753,12 @@ curatedSel.onchange = newPuzzle;
 
 // ---------- Init ----------
 populateCuratedSelect();
-newPuzzle();
+const sharedPuzzle = getSharedPuzzleFromURL();
+if(sharedPuzzle){
+  loadSharedPuzzle(sharedPuzzle);
+} else {
+  newPuzzle();
+}
 </script>
 
 <script>
