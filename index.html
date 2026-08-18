@@ -1069,6 +1069,41 @@ function submitWord(){
     return;
   }
 
+  // Winning takes priority over backward navigation. After enough Flip Its,
+  // the same word can legitimately end up both already sitting in your
+  // current chain (from earlier bookkeeping) AND be the pinned word you need
+  // to reconnect to (state.prefill[0]) — Flip It works by reversing/swapping
+  // chain and prefill, so revisited words aren't unusual. If we checked
+  // "already in chain" first, reaching that word would just rewind the chain
+  // instead of recognizing it as a completed connection, and the puzzle
+  // would never register as solved. So check the win conditions first, no
+  // matter what else the word happens to also match.
+
+  // Reconnecting to a pinned "prefill" word (from an earlier Flip It) means
+  // the rest of that tail — already proven adjacent all the way to the
+  // target — completes automatically.
+  if(state.prefill.length && word === state.prefill[0]){
+    state.chain.push(word);
+    state.current = "";
+    state.chain = state.chain.concat(state.prefill.slice(1), [state.target]);
+    state.prefill = [];
+    state.solved = true;
+    stopTimer();
+    render();
+    setTimeout(showResults, 250);
+    return;
+  }
+
+  if(word === state.target){
+    state.chain.push(word);
+    state.current = "";
+    state.solved = true;
+    stopTimer();
+    render();
+    setTimeout(showResults, 250);
+    return;
+  }
+
   // Backward navigation: if this word already appears earlier in the path
   // (including the start word), treat it as stepping back — no penalty message,
   // just rewind the chain to that point so you can try a different branch.
@@ -1088,28 +1123,6 @@ function submitWord(){
 
   state.chain.push(word);
   state.current = "";
-
-  // Reconnecting to a pinned "prefill" word (from an earlier Flip It) means
-  // the rest of that tail — already proven adjacent all the way to the
-  // target — completes automatically.
-  if(state.prefill.length && word === state.prefill[0]){
-    state.chain = state.chain.concat(state.prefill.slice(1), [state.target]);
-    state.prefill = [];
-    state.solved = true;
-    stopTimer();
-    render();
-    setTimeout(showResults, 250);
-    return;
-  }
-
-  if(word === state.target){
-    state.solved = true;
-    stopTimer();
-    render();
-    setTimeout(showResults, 250);
-    return;
-  }
-
   render();
 }
 
