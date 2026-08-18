@@ -590,8 +590,8 @@
   </label>
   <label id="difficultyWrap" style="font-size:0.85rem;color:var(--muted);">Difficulty
     <select id="difficulty">
-      <option value="easy">Easy</option>
-      <option value="medium" selected>Medium</option>
+      <option value="easy" selected>Easy</option>
+      <option value="medium">Medium</option>
       <option value="hard">Hard</option>
     </select>
   </label>
@@ -816,7 +816,7 @@ function computeScore(optimalWords, wordsUsed, timeMs){
 
 // ---------- Game state ----------
 let state = {
-  tier: "medium",
+  tier: "easy",
   mode: "random",
   start: "bird",
   target: "word",
