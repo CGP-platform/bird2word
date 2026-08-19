@@ -1,10 +1,11 @@
+
 // BIRD2WORD service worker — minimal, no-framework caching so the site can
 // be installed as an app (Chrome/Android "Install app" / "Add to Home
 // Screen", and iOS Safari's own Add-to-Home-Screen) and still open even with
 // a flaky connection. Bump CACHE_NAME whenever these core files change so
 // installed apps pick up the update instead of serving a stale copy forever.
-const CACHE_NAME = "bird2word-v2";
-
+const CACHE_NAME = "bird2word-v3";
+ 
 const CORE_ASSETS = [
   "index.html",
   "about.html",
@@ -15,7 +16,7 @@ const CORE_ASSETS = [
   "logo/icon-512.png",
   "logo/icon-1024.png"
 ];
-
+ 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -24,7 +25,7 @@ self.addEventListener("install", (event) => {
   );
   self.skipWaiting();
 });
-
+ 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -33,7 +34,7 @@ self.addEventListener("activate", (event) => {
   );
   self.clients.claim();
 });
-
+ 
 // Stale-while-revalidate: serve from cache instantly if we have it (so the
 // installed app opens fast/offline), and always kick off a network fetch in
 // the background to keep the cache fresh for next time.
@@ -41,7 +42,7 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return; // don't intercept fonts/CDN, etc.
-
+ 
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const networkFetch = fetch(event.request)
