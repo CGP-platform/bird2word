@@ -1,17 +1,18 @@
-
 // BIRD2WORD service worker — minimal, no-framework caching so the site can
 // be installed as an app (Chrome/Android "Install app" / "Add to Home
 // Screen", and iOS Safari's own Add-to-Home-Screen) and still open even with
 // a flaky connection. Bump CACHE_NAME whenever these core files change so
 // installed apps pick up the update instead of serving a stale copy forever.
-const CACHE_NAME = "bird2word-v4";
+const CACHE_NAME = "bird2word-v5";
  
 const CORE_ASSETS = [
   "index.html",
   "about.html",
   "playground.html",
   "merch.html",
+  "es.html",
   "manifest.json",
+  "manifest-es.json",
   "logo/icon-192.png",
   "logo/icon-512.png",
   "logo/icon-1024.png"
@@ -58,4 +59,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
- 
