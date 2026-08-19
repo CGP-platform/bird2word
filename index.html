@@ -1800,6 +1800,19 @@ if(sharedPuzzle){
   var gameContent = document.getElementById("gameContent");
   if(!overlay || !boardEl || !startBtn || !gameContent) return;
 
+  // Only play the intro animation once per 24 hours per device -- if the
+  // player already clicked through "Let's Play!" within the last day, skip
+  // straight to the game instead of replaying the whole BIRD->WORD reveal.
+  var INTRO_KEY = "birdToWordIntroLastShown";
+  var DAY_MS = 24 * 60 * 60 * 1000;
+  var lastShown = null;
+  try{ lastShown = parseInt(localStorage.getItem(INTRO_KEY), 10); }catch(e){}
+  if(lastShown && !isNaN(lastShown) && (Date.now() - lastShown) < DAY_MS){
+    overlay.remove();
+    gameContent.classList.add("game-show");
+    return;
+  }
+
   var STEPS = [
     { word:"BIRD", locked:true },
     { word:"BARD", colors:["","changed","match","match"] },
@@ -1844,6 +1857,7 @@ if(sharedPuzzle){
   }, delay);
 
   function beginGame(){
+    try{ localStorage.setItem(INTRO_KEY, String(Date.now())); }catch(e){}
     overlay.classList.add("intro-hide");
     gameContent.classList.add("game-show");
     setTimeout(function(){ overlay.remove(); }, 700);
