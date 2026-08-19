@@ -1,0 +1,17 @@
+{
+  "name": "BIRD2WORD Español",
+  "short_name": "BIRD2WORD ES",
+  "description": "Un juego de escalera de palabras — convierte una palabra en otra, una letra a la vez.",
+  "start_url": "es.html",
+  "scope": ".",
+  "id": "bird2word-es",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fafafa",
+  "theme_color": "#3a7ca5",
+  "icons": [
+    { "src": "logo/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "logo/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "logo/icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}
