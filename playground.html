@@ -254,9 +254,100 @@
     color:var(--muted);
     text-align:center;
   }
+
+  /* ---------- Site nav ---------- */
+  .site-nav{
+    width:100%;
+    max-width:560px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    padding:10px 14px;
+    margin:0 0 18px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+  }
+  .site-nav-logo{
+    font-weight:800;
+    font-size:1rem;
+    letter-spacing:-0.02em;
+    color:var(--text);
+    text-decoration:none;
+    flex-shrink:0;
+  }
+  .site-nav-logo .two{ color:var(--changed,#f4c430); }
+  .site-nav-links{ display:flex; gap:14px; flex-wrap:wrap; }
+  .site-nav-links a{
+    font-size:0.82rem;
+    font-weight:600;
+    color:var(--muted);
+    text-decoration:none;
+  }
+  .site-nav-links a:hover{ color:var(--accent); }
+  .site-nav-links a.current{ color:var(--accent); }
+  .site-nav-cta{
+    font-size:0.82rem;
+    font-weight:700;
+    color:#fff;
+    background:var(--accent);
+    padding:7px 14px;
+    border-radius:6px;
+    text-decoration:none;
+    white-space:nowrap;
+    transition:background 0.15s ease, transform 0.15s ease;
+  }
+  .site-nav-cta:hover{ background:#316a8f; transform:translateY(-1px); }
+  @media (max-width:480px){
+    .site-nav{ justify-content:center; text-align:center; }
+    .site-nav-links{ justify-content:center; }
+  }
+
+  /* ---------- Easter eggs ---------- */
+  .easter-toast{
+    position:fixed;
+    bottom:18px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:#1a1a1b;
+    color:#fff;
+    padding:10px 16px;
+    border-radius:8px;
+    font-size:0.8rem;
+    font-weight:600;
+    max-width:90vw;
+    text-align:center;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.4s ease, transform 0.4s ease;
+    z-index:9998;
+    box-shadow:0 4px 16px rgba(0,0,0,0.25);
+  }
+  .easter-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .easter-confetti-canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    z-index:9997;
+  }
 </style>
 </head>
 <body>
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav-logo">BIRD<span class="two">2</span>WORD</a>
+  <div class="site-nav-links">
+    <a href="about.html">About</a>
+    <a href="playground.html" class="current">Playground</a>
+    <a href="merch.html">Merch</a>
+    <a href="es.html">Español</a>
+  </div>
+  <a href="index.html" class="site-nav-cta">🎮 Skip the practice, play for real</a>
+</nav>
 
 <header>
   <div class="logo-lockup">
@@ -458,5 +549,106 @@ if("serviceWorker" in navigator){
   });
 }
 </script>
+<script>
+// ---------- Easter eggs ----------
+(function(){
+  var TOAST_LINES = [
+    "Fun fact: WORD has more vowels than BIRD deserves.",
+    "Somewhere, a lexicographer is very proud of you right now.",
+    "Pro tip: SOFT and HARD are only 4 letters apart. Groundbreaking stuff.",
+    "You've unlocked... absolutely nothing. Carry on.",
+    "BIRD2WORD: because BIRD2SENTENCE didn't fit on the logo.",
+    "Studies show 100% of people who read this message can also read.",
+    "Achievement unlocked: visited a webpage.",
+    "Legal disclaimer: no birds were turned into words in the making of this game.",
+    "Keep scrolling. Or don't. We're not the boss of you.",
+    "This is a completely useless message. You're welcome."
+  ];
+
+  function showToast(text, ms){
+    var t = document.createElement("div");
+    t.className = "easter-toast";
+    t.textContent = text;
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.classList.add("show"); });
+    setTimeout(function(){
+      t.classList.remove("show");
+      setTimeout(function(){ t.remove(); }, 500);
+    }, ms || 4000);
+  }
+
+  // Small random chance of a silly one-liner toast on page load.
+  if(Math.random() < 0.08){
+    setTimeout(function(){
+      showToast(TOAST_LINES[Math.floor(Math.random() * TOAST_LINES.length)]);
+    }, 1400);
+  }
+
+  // Lightweight standalone confetti burst -- this page has no game board canvas.
+  function burstConfetti(){
+    var canvas = document.createElement("canvas");
+    canvas.className = "easter-confetti-canvas";
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    var ctx = canvas.getContext("2d");
+    var colors = ["#4a90e2", "#f4c430", "#6aaa64"];
+    var pieces = [];
+    for(var i = 0; i < 150; i++){
+      pieces.push({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.6,
+        w: 6 + Math.random() * 6,
+        h: 8 + Math.random() * 8,
+        color: colors[i % colors.length],
+        vy: 1.4 + Math.random() * 2,
+        vx: -1.6 + Math.random() * 3.2,
+        rotation: Math.random() * 360,
+        vr: -9 + Math.random() * 18
+      });
+    }
+    var start = performance.now();
+    function frame(now){
+      var elapsed = now - start;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      var stillFalling = false;
+      pieces.forEach(function(p){
+        p.x += p.vx; p.y += p.vy; p.vy += 0.018; p.rotation += p.vr;
+        if(p.y < canvas.height + 20) stillFalling = true;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation * Math.PI / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      });
+      if(elapsed < 4500 && stillFalling){
+        requestAnimationFrame(frame);
+      } else {
+        canvas.remove();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Konami code: the secret handshake.
+  var KONAMI = ["arrowup","arrowup","arrowdown","arrowdown","arrowleft","arrowright","arrowleft","arrowright","b","a"];
+  var pos = 0;
+  document.addEventListener("keydown", function(e){
+    var key = e.key.toLowerCase();
+    if(key === KONAMI[pos]){
+      pos++;
+      if(pos === KONAMI.length){
+        pos = 0;
+        burstConfetti();
+        showToast("🎉 You found the secret code! Achievement unlocked: Certified Word Nerd.", 5000);
+      }
+    } else {
+      pos = (key === KONAMI[0]) ? 1 : 0;
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
