@@ -1584,8 +1584,13 @@ function buildShareMessage(){
 // as the live board (see makeRow()/the CSS above): per-letter "match" (blue)
 // highlighting for in-progress rows, and solid green for the completed
 // final row (it no longer gets per-letter blue "match" tiles either — see
-// tileColorsFor()'s isSolvedRow case) — so the image matches what the
-// player actually sees on the live board.
+// tileColorsFor()'s isSolvedRow case) — so the image's colors match what the
+// player actually sees on the live board. Letters are a different story:
+// every word strictly between the start and target rows gets its letters
+// hidden (blank tile, color untouched) so a shared screenshot shows off the
+// solve's shape/efficiency without spoiling the actual words used — the
+// start and target words stay visible since they're already public (they
+// ARE the puzzle being shared).
 function roundRectPath(ctx, x, y, w, h, r){
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -1660,6 +1665,14 @@ function buildResultCanvas(){
   rows.forEach((word, rIdx) => {
     const isStart = rIdx === 0;
     const isSolvedRow = word === target;
+    // Every word strictly between the start and target rows was a word the
+    // player actually typed to solve this puzzle -- hide those letters so a
+    // shared image doesn't spoil the solution path for anyone who wants to
+    // try the same puzzle. The start word and target word are already known
+    // (they're literally the puzzle being shared), so those stay visible.
+    // Tile colors are untouched either way -- only the letter glyph is
+    // skipped -- so the image still shows the shape of the solve.
+    const hideLetters = !isStart && !isSolvedRow;
     const prev = isStart ? null : rows[rIdx - 1];
     const changedIdx = prev ? diffLetterIndex(prev, word) : -1;
     for(let c = 0; c < word.length; c++){
@@ -1672,11 +1685,13 @@ function buildResultCanvas(){
       ctx.lineWidth = 2;
       ctx.strokeStyle = colors.border;
       ctx.stroke();
-      ctx.fillStyle = colors.text;
-      ctx.font = `700 24px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(word[c].toUpperCase(), x + tile / 2, y + tile / 2 + 2);
+      if(!hideLetters){
+        ctx.fillStyle = colors.text;
+        ctx.font = `700 24px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(word[c].toUpperCase(), x + tile / 2, y + tile / 2 + 2);
+      }
     }
   });
   ctx.textAlign = "left";
