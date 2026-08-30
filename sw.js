@@ -4,7 +4,7 @@
 // Screen", and iOS Safari's own Add-to-Home-Screen) and still open even with
 // a flaky connection. Bump CACHE_NAME whenever these core files change so
 // installed apps pick up the update instead of serving a stale copy forever.
-const CACHE_NAME = "bird2word-v7";
+const CACHE_NAME = "bird2word-v8";
  
 const CORE_ASSETS = [
   "index.html",
@@ -60,4 +60,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
- 
