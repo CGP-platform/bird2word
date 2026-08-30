@@ -137,6 +137,9 @@
     padding:0 4px;
   }
   .status-bar span b{ color:var(--text); }
+  .time-toggle{ cursor:pointer; user-select:none; }
+  .time-toggle:hover{ color:var(--accent); }
+  .time-toggle:hover b{ color:var(--accent); }
 
   .board-area{
     display:flex;
@@ -251,6 +254,24 @@
     30%,50%,70%{ transform:translateX(-6px); }
     40%,60%{ transform:translateX(6px); }
   }
+  /* Empty cells in the row you're currently typing stay a flat light grey
+     (no border-only "outline" look) until a letter lands in them. */
+  .tile.empty{ background:#e9ebee; border-color:#d8dbdf; }
+  @keyframes tileInvite{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.35; }
+  }
+  /* Only the very first tile of a fresh puzzle gets this, as a "tap here"
+     cue -- it's removed the moment the board is tapped or typed into. */
+  .tile.invite{ animation:tileInvite 1.3s ease-in-out infinite; }
+  /* Same first tile, once the 3-2-1 auto-start countdown is running --
+     each render() rebuilds the tile fresh, so this animation naturally
+     replays on every count change with no extra JS needed. */
+  @keyframes countdownPop{
+    0%{ transform:scale(1.35); opacity:0.5; }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  .tile.countdown{ color:var(--accent); animation:countdownPop 0.3s ease-out; }
 
   /* ---------- Intro animation ---------- */
   #introOverlay{
@@ -636,7 +657,7 @@
 <div class="puzzle-label" id="puzzleLabel"></div>
 
 <div class="status-bar">
-  <span>Time: <b id="timer">00:00.0</b></span>
+  <span id="timeStat" class="time-toggle">Time: <b id="timer">00:00.0</b></span>
   <span>Words used: <b id="wordCount">0</b></span>
 </div>
 
@@ -868,6 +889,7 @@ let state = {
 const boardEl = document.getElementById("board");
 const messageEl = document.getElementById("message");
 const timerEl = document.getElementById("timer");
+const timeStatEl = document.getElementById("timeStat");
 const wordCountEl = document.getElementById("wordCount");
 const modeSel = document.getElementById("mode");
 const difficultySel = document.getElementById("difficulty");
@@ -969,6 +991,42 @@ function fmtTime(ms){
   return `${String(m).padStart(2,"0")}:${s.padStart(4,"0")}`;
 }
 
+// ---------- Clock hide/show ----------
+// Tap "Time: 00:00.0" to blank out the digits (still ticking underneath)
+// -- tap again to reveal. A session-only preference, not saved anywhere.
+let timerHidden = false;
+function updateTimerDisplay(){
+  timerEl.textContent = timerHidden ? "--:--.-" : fmtTime(state.elapsedMs);
+}
+
+// ---------- Auto-start countdown ----------
+// If a fresh puzzle sits untouched for 3 seconds, the clock starts on its
+// own -- the first tile counts 3, 2, 1 (instead of just blinking) so it's
+// obvious why. This only starts the CLOCK, not the on-screen keyboard --
+// phones only allow that to open from a real tap (see the board's click
+// handler below), so tapping is still how you actually start typing.
+let countdownValue = null;
+let countdownHandle = null;
+
+function clearInviteCountdown(){
+  if(countdownHandle){ clearInterval(countdownHandle); countdownHandle = null; }
+  countdownValue = null;
+}
+
+function armInviteCountdown(){
+  clearInviteCountdown();
+  countdownValue = 3;
+  render();
+  countdownHandle = setInterval(() => {
+    countdownValue -= 1;
+    if(countdownValue <= 0){
+      clearInviteCountdown();
+      startTimerIfNeeded();
+    }
+    render();
+  }, 1000);
+}
+
 function render(){
   boardEl.innerHTML = "";
 
@@ -995,7 +1053,25 @@ function render(){
   if(!state.solved){
     const letters = state.current.split("");
     while(letters.length < 4) letters.push("");
-    boardEl.appendChild(makeRow(letters, "active", -1, state.target));
+    const activeRow = makeRow(letters, "active", -1, state.target);
+    boardEl.appendChild(activeRow);
+    // Invite tap: only on a completely untouched puzzle (nothing typed or
+    // submitted yet, no Flip It prefill in progress, timer not started).
+    const freshPuzzle = state.chain.length === 0 && state.current.length === 0 &&
+      !state.timerHandle && state.prefill.length === 0;
+    if(freshPuzzle){
+      const firstTile = activeRow.firstElementChild;
+      if(firstTile){
+        if(countdownValue){
+          // 3-2-1 auto-start countdown is running -- show the number
+          // instead of the plain blink.
+          firstTile.textContent = String(countdownValue);
+          firstTile.classList.add("countdown");
+        } else {
+          firstTile.classList.add("invite");
+        }
+      }
+    }
   }
 
   // prefilled rows from an earlier Flip It — already proven to connect all
@@ -1029,6 +1105,7 @@ function render(){
   if(mobileInputEl && mobileInputEl.value !== state.current){
     mobileInputEl.value = state.current;
   }
+
 }
 
 function makeRow(letters, cls, changedIdx, target){
@@ -1037,7 +1114,9 @@ function makeRow(letters, cls, changedIdx, target){
   letters.forEach((ch, i) => {
     const tile = document.createElement("div");
     let tileCls = "tile";
-    if(target && ch && ch === target[i]){
+    if(!ch){
+      tileCls += " empty";
+    } else if(target && ch === target[i]){
       tileCls += " match";
     } else if(i === changedIdx){
       tileCls += " changed";
@@ -1069,7 +1148,7 @@ function startTimer(){
   state.startTime = Date.now();
   state.timerHandle = setInterval(()=>{
     state.elapsedMs = Date.now() - state.startTime;
-    timerEl.textContent = fmtTime(state.elapsedMs);
+    updateTimerDisplay();
   }, 100);
 }
 function stopTimer(){
@@ -1172,9 +1251,10 @@ function restartPuzzle(){
   state.prefill = [];
   state.flipsUsed = 0;
   state.gaveUp = false;
-  timerEl.textContent = "00:00.0";
+  updateTimerDisplay();
   document.getElementById("mercyPanel").classList.remove("show");
   render();
+  armInviteCountdown();
   // Timer stays at 00:00.0, not running, until the player types their
   // first letter — see startTimerIfNeeded().
 }
@@ -1232,9 +1312,10 @@ function loadSharedPuzzle(p){
   state.prefill = [];
   state.flipsUsed = 0;
   state.gaveUp = false;
-  timerEl.textContent = "00:00.0";
+  updateTimerDisplay();
   document.getElementById("mercyPanel").classList.remove("show");
   render();
+  armInviteCountdown();
   updatePuzzleLabel();
   updateStatsPanel();
 }
@@ -1265,9 +1346,10 @@ function newPuzzle(){
   state.prefill = [];
   state.flipsUsed = 0;
   state.gaveUp = false;
-  timerEl.textContent = "00:00.0";
+  updateTimerDisplay();
   document.getElementById("mercyPanel").classList.remove("show");
   render();
+  armInviteCountdown();
   updatePuzzleLabel();
   updateStatsPanel();
   // Timer stays at 00:00.0, not running, until the player types their
@@ -1278,6 +1360,9 @@ function newPuzzle(){
 // puzzle. Idempotent — safe to call on every keystroke, since it only
 // actually starts anything the first time (state.timerHandle is null).
 function startTimerIfNeeded(){
+  // Any real reason the timer is starting -- typing, or the countdown
+  // itself -- means the auto-start countdown is no longer needed.
+  clearInviteCountdown();
   if(state.timerHandle === null && !state.solved){
     startTimer();
   }
@@ -1365,7 +1450,23 @@ mobileInputEl.addEventListener("keydown", (e) => {
 // which is what actually triggers the phone's on-screen keyboard — this
 // has to happen inside a real tap/click handler, not automatically, or
 // most phones will refuse to show the keyboard.
-boardEl.addEventListener("click", () => mobileInputEl.focus({ preventScroll: true }));
+boardEl.addEventListener("click", () => {
+  mobileInputEl.focus({ preventScroll: true });
+  // The "tap here" blink is a one-time invitation — kill it the instant
+  // the board's been tapped, regardless of what render() does next.
+  const inviteTile = boardEl.querySelector(".tile.invite");
+  if(inviteTile) inviteTile.classList.remove("invite");
+  // Tapping counts as "clicked to initiate" -- stop the 3-2-1 auto-start
+  // countdown (it may not have reached 0 and started the clock yet).
+  clearInviteCountdown();
+});
+
+// Click "Time: 00:00.0" to blank out the digits (it keeps ticking behind
+// the scenes) -- click again to reveal.
+timeStatEl.addEventListener("click", () => {
+  timerHidden = !timerHidden;
+  updateTimerDisplay();
+});
 
 // ---------- Stats (localStorage) ----------
 const STATS_KEY = "birdToWordStats_v2";
