@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1219304901871124"
+     crossorigin="anonymous"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BIRD2WORD</title>
@@ -1007,6 +1009,15 @@ function updateTimerDisplay(){
 // handler below), so tapping is still how you actually start typing.
 let countdownValue = null;
 let countdownHandle = null;
+// The very first puzzle is created (via newPuzzle(), below) while the intro
+// animation overlay is still covering the board -- without this guard, the
+// 3-second window would run out silently behind the overlay, and by the
+// time the player actually sees the board the clock would already be
+// running with no blink/countdown ever shown. gameContentVisible starts
+// true only if there's no intro overlay on this page at all; otherwise
+// armInviteCountdown() is a no-op until markGameContentVisible() (called
+// once the overlay is actually dismissed) arms it for real.
+let gameContentVisible = !document.getElementById("introOverlay");
 
 function clearInviteCountdown(){
   if(countdownHandle){ clearInterval(countdownHandle); countdownHandle = null; }
@@ -1015,6 +1026,7 @@ function clearInviteCountdown(){
 
 function armInviteCountdown(){
   clearInviteCountdown();
+  if(!gameContentVisible) return;
   countdownValue = 3;
   render();
   countdownHandle = setInterval(() => {
@@ -1025,6 +1037,12 @@ function armInviteCountdown(){
     }
     render();
   }, 1000);
+}
+
+function markGameContentVisible(){
+  if(gameContentVisible) return;
+  gameContentVisible = true;
+  armInviteCountdown();
 }
 
 function render(){
@@ -1948,6 +1966,7 @@ if(sharedPuzzle){
   if(lastShown && !isNaN(lastShown) && (Date.now() - lastShown) < DAY_MS){
     overlay.remove();
     gameContent.classList.add("game-show");
+    if(typeof markGameContentVisible === "function") markGameContentVisible();
     return;
   }
 
@@ -2004,6 +2023,14 @@ if(sharedPuzzle){
     // focus() happens directly inside a real user gesture like this one.
     var mobileInput = document.getElementById("mobileInput");
     if(mobileInput) mobileInput.focus({ preventScroll: true });
+    // Tapping "Let's Play!" is itself the "click to start" gesture, same as
+    // tapping the board -- cancel the blink/countdown for this first
+    // puzzle (the player's already engaged) but flip gameContentVisible on
+    // so every puzzle after this one gets its own normal 3-2-1 window.
+    gameContentVisible = true;
+    if(typeof clearInviteCountdown === "function") clearInviteCountdown();
+    var inviteTile = document.querySelector(".row.active .tile.invite");
+    if(inviteTile) inviteTile.classList.remove("invite");
   }
   startBtn.addEventListener("click", beginGame);
 })();
