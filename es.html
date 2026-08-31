@@ -1257,7 +1257,10 @@ function startTimerIfNeeded(){
 function handleKey(key){
   if(state.solved) return;
   if(document.getElementById("uncleOverlay").classList.contains("show")) return;
-  if(key === "Enter"){
+  if(key === "Enter" || key === " "){
+    // Space submits too, same as Enter -- it's the key your thumb is
+    // already resting near after typing a 4-letter word, so it's a faster
+    // way to submit without reaching for Enter/Return.
     submitWord();
   } else if(key === "Backspace"){
     state.current = state.current.slice(0,-1);
@@ -1291,12 +1294,15 @@ document.addEventListener("keydown", (e)=>{
   // double-process the same keystroke.
   if(e.target === mobileInputEl) return;
   if(e.metaKey || e.ctrlKey || e.altKey) return;
-  if(e.key === "Enter" || e.key === "Backspace" || /^[a-zA-ZñÑ]$/.test(e.key)){
+  if(e.key === "Enter" || e.key === " " || e.key === "Backspace" || /^[a-zA-ZñÑ]$/.test(e.key)){
     // Prevent default so a focused button (e.g. "New Puzzle") doesn't also
-    // fire its own click when Enter is pressed, which would double-trigger.
+    // fire its own click when Enter/Space is pressed (space natively
+    // "clicks" a focused button too), which would double-trigger, and so
+    // Space doesn't scroll the page.
     e.preventDefault();
-    // Blur whatever currently has focus so repeated Enter presses can't
-    // re-activate a button (like Restart or New Puzzle) that was just clicked.
+    // Blur whatever currently has focus so repeated Enter/Space presses
+    // can't re-activate a button (like Restart or New Puzzle) that was
+    // just clicked.
     if(document.activeElement && document.activeElement !== document.body && document.activeElement.blur){
       document.activeElement.blur();
     }
@@ -1323,9 +1329,10 @@ mobileInputEl.addEventListener("input", () => {
 });
 mobileInputEl.addEventListener("keydown", (e) => {
   // Letters and Backspace are handled by the "input" listener above via
-  // the field's value — only Enter (submit) needs special handling here,
-  // since it never changes the field's text.
-  if(e.key === "Enter"){
+  // the field's value — only Enter/Space (submit) need special handling
+  // here, since neither one changes the field's text (Space would just
+  // get stripped by the "input" listener's letters-only filter anyway).
+  if(e.key === "Enter" || e.key === " "){
     e.preventDefault();
     handleKey("Enter");
   }
