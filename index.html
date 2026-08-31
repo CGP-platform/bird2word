@@ -1390,7 +1390,10 @@ function startTimerIfNeeded(){
 function handleKey(key){
   if(state.solved) return;
   if(document.getElementById("uncleOverlay").classList.contains("show")) return;
-  if(key === "Enter"){
+  if(key === "Enter" || key === " "){
+    // Space submits too, same as Enter -- it's the key your thumb is
+    // already resting near after typing a 4-letter word, so it's a faster
+    // way to submit without reaching for Enter/Return.
     submitWord();
   } else if(key === "Backspace"){
     state.current = state.current.slice(0,-1);
@@ -1424,12 +1427,15 @@ document.addEventListener("keydown", (e)=>{
   // double-process the same keystroke.
   if(e.target === mobileInputEl) return;
   if(e.metaKey || e.ctrlKey || e.altKey) return;
-  if(e.key === "Enter" || e.key === "Backspace" || /^[a-zA-Z]$/.test(e.key)){
+  if(e.key === "Enter" || e.key === " " || e.key === "Backspace" || /^[a-zA-Z]$/.test(e.key)){
     // Prevent default so a focused button (e.g. "New Puzzle") doesn't also
-    // fire its own click when Enter is pressed, which would double-trigger.
+    // fire its own click when Enter/Space is pressed (space natively
+    // "clicks" a focused button too), which would double-trigger, and so
+    // Space doesn't scroll the page.
     e.preventDefault();
-    // Blur whatever currently has focus so repeated Enter presses can't
-    // re-activate a button (like Restart or New Puzzle) that was just clicked.
+    // Blur whatever currently has focus so repeated Enter/Space presses
+    // can't re-activate a button (like Restart or New Puzzle) that was
+    // just clicked.
     if(document.activeElement && document.activeElement !== document.body && document.activeElement.blur){
       document.activeElement.blur();
     }
@@ -1456,9 +1462,10 @@ mobileInputEl.addEventListener("input", () => {
 });
 mobileInputEl.addEventListener("keydown", (e) => {
   // Letters and Backspace are handled by the "input" listener above via
-  // the field's value — only Enter (submit) needs special handling here,
-  // since it never changes the field's text.
-  if(e.key === "Enter"){
+  // the field's value — only Enter/Space (submit) need special handling
+  // here, since neither one changes the field's text (Space would just
+  // get stripped by the "input" listener's letters-only filter anyway).
+  if(e.key === "Enter" || e.key === " "){
     e.preventDefault();
     handleKey("Enter");
   }
@@ -2020,37 +2027,21 @@ if(sharedPuzzle){
   }, delay);
 
   function beginGame(){
-    // Focus the hidden mobile-keyboard field FIRST, as the very first thing
-    // this handler does, synchronously inside the same tap — phones only
-    // allow the on-screen keyboard to pop up when focus() happens directly
-    // inside a real user gesture, and doing it before any other DOM work
-    // gives mobile WebKit the least chance to decide the gesture "expired."
-    var mobileInput = document.getElementById("mobileInput");
-    if(mobileInput) mobileInput.focus({ preventScroll: true });
     try{ localStorage.setItem(INTRO_KEY, String(Date.now())); }catch(e){}
     overlay.classList.add("intro-hide");
     gameContent.classList.add("game-show");
     setTimeout(function(){ overlay.remove(); }, 700);
-    // Tapping "Let's Play!" is itself the "click to start" gesture, same as
-    // tapping the board -- cancel the blink/countdown for this first
-    // puzzle (the player's already engaged) but flip gameContentVisible on
-    // so every puzzle after this one gets its own normal 3-2-1 window.
-    gameContentVisible = true;
-    if(typeof clearInviteCountdown === "function") clearInviteCountdown();
-    var inviteTile = document.querySelector(".row.active .tile.invite");
-    if(inviteTile) inviteTile.classList.remove("invite");
+    // Tapping "Let's Play!" just reveals the board -- it does NOT skip
+    // straight to "already engaged." markGameContentVisible() arms the same
+    // blink -> 3-2-1 countdown every other puzzle gets (it's the same call
+    // the 24-hour-skip branch above makes), so the very first puzzle of a
+    // session looks and behaves exactly like every puzzle after it: the
+    // keyboard opens when the countdown finishes (best-effort -- see the
+    // platform-constraint note in armInviteCountdown()) OR the instant the
+    // player taps the board, never any earlier and never any differently.
+    if(typeof markGameContentVisible === "function") markGameContentVisible();
   }
   startBtn.addEventListener("click", beginGame);
-  // Belt-and-suspenders: on some mobile Safari/WebKit builds a
-  // "click"-triggered focus() on the very first tap of a session is
-  // unreliable, but the same focus() call made from "touchend" (the more
-  // immediate, native gesture) goes through. This doesn't run beginGame()
-  // again -- it only makes a second attempt at opening the keyboard field;
-  // calling focus() twice on an already-focused field is a harmless no-op.
-  startBtn.addEventListener("touchend", function(){
-    var mobileInput = document.getElementById("mobileInput");
-    if(mobileInput) mobileInput.focus({ preventScroll: true });
-  });
 })();
 </script>
 
