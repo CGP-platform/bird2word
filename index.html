@@ -1478,6 +1478,12 @@ boardEl.addEventListener("click", () => {
   // countdown (it may not have reached 0 and started the clock yet).
   clearInviteCountdown();
 });
+// Same belt-and-suspenders as the "Let's Play!" button: a second focus()
+// attempt on "touchend" in case this device's first "click"-triggered
+// focus() of the session doesn't pop the keyboard.
+boardEl.addEventListener("touchend", () => {
+  mobileInputEl.focus({ preventScroll: true });
+});
 
 // Click "Time: 00:00.0" to blank out the digits (it keeps ticking behind
 // the scenes) -- click again to reveal.
@@ -2014,15 +2020,17 @@ if(sharedPuzzle){
   }, delay);
 
   function beginGame(){
+    // Focus the hidden mobile-keyboard field FIRST, as the very first thing
+    // this handler does, synchronously inside the same tap — phones only
+    // allow the on-screen keyboard to pop up when focus() happens directly
+    // inside a real user gesture, and doing it before any other DOM work
+    // gives mobile WebKit the least chance to decide the gesture "expired."
+    var mobileInput = document.getElementById("mobileInput");
+    if(mobileInput) mobileInput.focus({ preventScroll: true });
     try{ localStorage.setItem(INTRO_KEY, String(Date.now())); }catch(e){}
     overlay.classList.add("intro-hide");
     gameContent.classList.add("game-show");
     setTimeout(function(){ overlay.remove(); }, 700);
-    // Focus the hidden mobile-keyboard field synchronously, inside this
-    // same tap — phones only allow the on-screen keyboard to pop up when
-    // focus() happens directly inside a real user gesture like this one.
-    var mobileInput = document.getElementById("mobileInput");
-    if(mobileInput) mobileInput.focus({ preventScroll: true });
     // Tapping "Let's Play!" is itself the "click to start" gesture, same as
     // tapping the board -- cancel the blink/countdown for this first
     // puzzle (the player's already engaged) but flip gameContentVisible on
@@ -2033,6 +2041,16 @@ if(sharedPuzzle){
     if(inviteTile) inviteTile.classList.remove("invite");
   }
   startBtn.addEventListener("click", beginGame);
+  // Belt-and-suspenders: on some mobile Safari/WebKit builds a
+  // "click"-triggered focus() on the very first tap of a session is
+  // unreliable, but the same focus() call made from "touchend" (the more
+  // immediate, native gesture) goes through. This doesn't run beginGame()
+  // again -- it only makes a second attempt at opening the keyboard field;
+  // calling focus() twice on an already-focused field is a harmless no-op.
+  startBtn.addEventListener("touchend", function(){
+    var mobileInput = document.getElementById("mobileInput");
+    if(mobileInput) mobileInput.focus({ preventScroll: true });
+  });
 })();
 </script>
 
