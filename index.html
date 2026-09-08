@@ -300,6 +300,7 @@
   .intro-wordmark .w-word{ color:var(--solved); }
   .intro-board{ display:flex; flex-direction:column; gap:6px; }
   .intro-row{ display:flex; gap:6px; justify-content:center; }
+  .intro-board{ perspective:600px; }
   .intro-tile{
     width:52px;
     height:52px;
@@ -313,11 +314,28 @@
     text-transform:uppercase;
     background:var(--panel);
     color:var(--text);
+    position:relative;
+    transform-style:preserve-3d;
+  }
+  /* Row 0 (the start word) still does a simple scale-in pop. */
+  .intro-tile.pop{
     opacity:0;
     transform:scale(0.5);
     transition:transform 0.25s cubic-bezier(.34,1.56,.64,1), background 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.2s ease;
   }
-  .intro-tile.show{ opacity:1; transform:scale(1); }
+  .intro-tile.pop.show{ opacity:1; transform:scale(1); }
+  /* The letter that's actually changing this step: flips into place. */
+  .intro-tile.flip-in{
+    opacity:0;
+    transform:rotateX(-90deg) scale(0.85);
+    transition:transform 0.4s cubic-bezier(.34,1.4,.4,1), opacity 0.2s ease, background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  }
+  .intro-tile.flip-in.show{ opacity:1; transform:rotateX(0deg) scale(1); }
+  .intro-tile.hidden{ visibility:hidden; }
+  /* The unchanged letters: drop straight down from the row above. */
+  .intro-tile.drop{
+    transition:transform 0.46s cubic-bezier(.34,1.2,.4,1), background-color 0.32s ease 0.08s, border-color 0.32s ease 0.08s, color 0.32s ease 0.08s;
+  }
   .intro-tile.locked{ background:#e7f1fb; border-color:#a9cbe8; color:#2c5a82; }
   .intro-tile.changed{ background:var(--changed); border-color:var(--changed); color:var(--changed-text); }
   .intro-tile.match{ background:var(--match); border-color:var(--match); color:var(--match-text); }
@@ -1983,42 +2001,100 @@ if(sharedPuzzle){
     return;
   }
 
+  // Each step names the ONE column index that changes from the previous
+  // word. Rendering makes that letter flip in first, then drops the three
+  // unchanged letters straight down from the row above -- so the ladder's
+  // one-letter-at-a-time rule is visually unmistakable.
   var STEPS = [
     { word:"BIRD", locked:true },
-    { word:"BARD", colors:["","changed","match","match"] },
-    { word:"WARD", colors:["changed","","match","match"] },
-    { word:"WORD", solved:true }
+    { word:"BARD", change:1 },
+    { word:"WARD", change:0 },
+    { word:"WORD", change:1, solved:true }
   ];
 
-  STEPS.forEach(function(step){
+  // The vertical gap between one row and the next -- used to make a
+  // "dropped" tile start exactly on top of the row above it, then animate
+  // down into its own row. Same for every row, so measure it once.
+  function measureRowStep(){
+    var probe = document.createElement("div");
+    probe.className = "intro-tile";
+    probe.style.visibility = "hidden";
+    probe.style.position = "absolute";
+    boardEl.appendChild(probe);
+    var h = probe.getBoundingClientRect().height;
+    boardEl.removeChild(probe);
+    var boardGap = parseFloat(getComputedStyle(boardEl).rowGap || getComputedStyle(boardEl).gap || "6");
+    return h + boardGap;
+  }
+
+  function buildRow(step, prevRow, rowStep){
     var row = document.createElement("div");
     row.className = "intro-row";
-    step.word.split("").forEach(function(ch){
-      var tile = document.createElement("div");
-      tile.className = "intro-tile";
-      tile.textContent = ch;
-      row.appendChild(tile);
-    });
     boardEl.appendChild(row);
-  });
 
-  var rows = boardEl.querySelectorAll(".intro-row");
+    var letters = step.word.split("");
+
+    if(step.locked){
+      // Row 0: the untouched start word. Simple pop-in, no ladder logic yet.
+      letters.forEach(function(ch, col){
+        var tile = document.createElement("div");
+        tile.textContent = ch;
+        tile.className = "intro-tile pop locked";
+        tile.dataset.tone = "locked";
+        row.appendChild(tile);
+        setTimeout(function(){ tile.classList.add("show"); }, col * 110);
+      });
+      return row;
+    }
+
+    var targetTone = step.solved ? "solved" : "match";
+    var changedTone = step.solved ? "solved" : "changed";
+
+    letters.forEach(function(ch, col){
+      var tile = document.createElement("div");
+      tile.textContent = ch;
+
+      if(col === step.change){
+        // Phase 1: reveal the one letter that's actually changing, in place.
+        tile.className = "intro-tile hidden flip-in " + changedTone;
+        tile.dataset.tone = changedTone;
+        row.appendChild(tile);
+        setTimeout(function(){
+          tile.classList.remove("hidden");
+          requestAnimationFrame(function(){ tile.classList.add("show"); });
+        }, 40);
+      } else {
+        // Phase 2 (once the changed letter has landed): this untouched
+        // letter drops straight down from the row above, keeping the
+        // letter it already had.
+        var prevTile = prevRow.children[col];
+        var startTone = (prevTile && prevTile.dataset.tone) || "locked";
+        tile.className = "intro-tile drop " + startTone;
+        tile.style.transform = "translateY(-" + rowStep + "px)";
+        row.appendChild(tile);
+        setTimeout(function(){
+          tile.style.transform = "translateY(0px)";
+          tile.className = "intro-tile drop " + targetTone;
+          tile.dataset.tone = targetTone;
+        }, 520);
+      }
+    });
+
+    return row;
+  }
+
+  var rowStep = null;
+  var prevRow = null;
   var delay = 400;
 
-  STEPS.forEach(function(step, ri){
-    var tiles = rows[ri].querySelectorAll(".intro-tile");
-    tiles.forEach(function(tile, ti){
-      (function(tile, step, ti){
-        setTimeout(function(){
-          tile.classList.add("show");
-          if(step.locked) tile.classList.add("locked");
-          if(step.solved) tile.classList.add("solved");
-          if(step.colors && step.colors[ti]) tile.classList.add(step.colors[ti]);
-        }, delay);
-      })(tile, step, ti);
-      delay += 140;
-    });
-    delay += 380; // pause between words
+  STEPS.forEach(function(step){
+    (function(step, stepDelay){
+      setTimeout(function(){
+        if(rowStep === null) rowStep = measureRowStep();
+        prevRow = buildRow(step, prevRow, rowStep);
+      }, stepDelay);
+    })(step, delay);
+    delay += step.locked ? 900 : 1350;
   });
 
   delay += 500; // hold on the solved word before offering Start
