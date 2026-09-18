@@ -69,12 +69,51 @@
   .logo-lockup .wordmark .two{ color:var(--changed); }
   .logo-lockup .wordmark .w-bird{ color:var(--match); }
   .logo-lockup .wordmark .w-word{ color:var(--solved); }
-  .beta-badge{
-    font-family:'Permanent Marker', cursive;
-    font-size:1.05rem;
-    color:#000;
-    transform:rotate(-8deg);
-    line-height:1;
+  .daily-progress-label{
+    margin:4px 0 0;
+    font-size:0.85rem;
+    font-weight:700;
+    color:var(--accent);
+  }
+  #dailyCompleteOverlay{
+    position:fixed;
+    inset:0;
+    z-index:9998;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:24px;
+    background:var(--bg);
+  }
+  #dailyCompleteOverlay.show{ display:flex; }
+  #dailyCompleteOverlay .daily-complete-emoji{
+    font-size:2.6rem;
+    margin:0 0 4px;
+  }
+  #dailyCompleteOverlay h2{
+    margin:0 0 8px;
+    font-size:1.4rem;
+    color:var(--text);
+  }
+  #dailyCompleteOverlay p.daily-complete-sub{
+    margin:0;
+    max-width:320px;
+    color:var(--muted);
+    font-size:0.92rem;
+    line-height:1.4;
+  }
+  #dailyCompleteOverlay .primary{
+    margin-top:24px;
+    padding:10px 28px;
+    font-size:0.95rem;
+    font-weight:700;
+    border-radius:8px;
+    border:1px solid var(--accent);
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
   }
   .tagline{
     margin:6px 0 2px;
@@ -644,12 +683,13 @@
 <header>
   <div class="logo-lockup">
     <span class="wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></span>
-    <span class="beta-badge">BETA</span>
   </div>
   <p class="tagline">Swift Words, Sharp Minds.</p>
   <p class="desc">Turn the start word into the target word, one letter at a time.</p>
+  <p class="daily-progress-label" id="dailyProgressLabel"></p>
 </header>
 
+<div id="freePlayControls" style="display:none;">
 <div class="controls">
   <label style="font-size:0.85rem;color:var(--muted);">Mode
     <select id="mode">
@@ -670,6 +710,9 @@
 </div>
 <div class="controls">
   <button id="newPuzzleBtn" class="primary">New Puzzle</button>
+</div>
+</div>
+<div class="controls">
   <button id="restartBtn">Restart</button>
   <button id="uncleBtn" class="uncle-btn">Mercy!</button>
 </div>
@@ -744,6 +787,13 @@
     <button type="button" id="shareImageBtn" class="share-btn">Share Screenshot</button>
     <button id="playAgainBtn" class="primary">New Puzzle</button>
   </div>
+</div>
+
+<div id="dailyCompleteOverlay" aria-hidden="true">
+  <div class="intro-wordmark"><span class="w-bird">BIRD</span><span class="two">2</span><span class="w-word">WORD</span></div>
+  <p class="daily-complete-emoji">🎉</p>
+  <h2>Great to see you!</h2>
+  <p class="daily-complete-sub">You've finished today's 4 challenges — Easy, Medium, Hard, and a Fun Word Pair. Come back tomorrow for a brand new set.</p>
 </div>
 
 <div id="uncleOverlay">
@@ -867,6 +917,191 @@ function generateCuratedPuzzle(pairIndex){
   return { start: p.start, end: p.end, shortest: p.shortest, label: p.label };
 }
 
+// ---------- Daily Challenges ----------
+// Everyone gets the same 4 puzzles on a given calendar day (Easy, Medium,
+// Hard, then a Fun Word Pair) — seeded off the date so no server/database is
+// needed, yet every player worldwide sees the same set that day. Free
+// players must finish them in order, one attempt each, then wait until
+// their device's local date rolls over. Paid players (app only — see
+// isPaidUser()) get the same daily set for flavor/comparison, but are never
+// locked out afterward.
+
+// Small, fast, deterministic PRNG (mulberry32) so "today" always reproduces
+// the exact same sequence of picks.
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function pickRandomSeeded(arr, rng){ return arr[Math.floor(rng()*arr.length)]; }
+
+function generateRandomPuzzleSeeded(tierKey, rng){
+  const tier = TIERS[tierKey];
+  const anchors = graphWords.filter(w => freq[w] >= tier.minFreq);
+  const pool = anchors.length > 20 ? anchors : graphWords;
+  for(let attempt=0; attempt<40; attempt++){
+    const start = pickRandomSeeded(pool, rng);
+    const dist = bfsDistances(start);
+    const candidates = Object.keys(dist).filter(w =>
+      w !== start && dist[w] >= tier.minDist && dist[w] <= tier.maxDist && freq[w] >= tier.minFreq
+    );
+    if(candidates.length){
+      const end = pickRandomSeeded(candidates, rng);
+      return { start, end, shortest: dist[end], label: null };
+    }
+  }
+  for(let attempt=0; attempt<40; attempt++){
+    const start = pickRandomSeeded(graphWords, rng);
+    const dist = bfsDistances(start);
+    const candidates = Object.keys(dist).filter(w =>
+      w !== start && dist[w] >= tier.minDist && dist[w] <= tier.maxDist
+    );
+    if(candidates.length){
+      const end = pickRandomSeeded(candidates, rng);
+      return { start, end, shortest: dist[end], label: null };
+    }
+  }
+  return { start: "bird", end: "word", shortest: bfsDistances("bird")["word"], label: null };
+}
+
+function generateCuratedPuzzleSeeded(rng){
+  const p = pickRandomSeeded(CURATED_PAIRS, rng);
+  return { start: p.start, end: p.end, shortest: p.shortest, label: p.label };
+}
+
+// Player's own device date as "YYYY-MM-DD" — the daily set changes at each
+// player's local midnight, not a fixed timezone.
+function todayKey(){
+  const d = new Date();
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+// Stable 32-bit hash of the date string, used as the PRNG seed.
+function seedFromDate(dateKey){
+  let h = 2166136261;
+  for(let i=0;i<dateKey.length;i++){
+    h ^= dateKey.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+const DAILY_TIERS = ["easy", "medium", "hard", "curated"];
+
+// Today's fixed set of 4 puzzles, same for every player. Each slot gets its
+// own sub-seed (offset from the day's base seed by a distinct prime) so the
+// four picks are independent of one another.
+function buildDailyPuzzles(dateKey){
+  const baseSeed = seedFromDate(dateKey);
+  return DAILY_TIERS.map((tierKey, i) => {
+    const rng = mulberry32(baseSeed + i * 104729);
+    return tierKey === "curated" ? generateCuratedPuzzleSeeded(rng) : generateRandomPuzzleSeeded(tierKey, rng);
+  });
+}
+
+// ---------- Daily progress (localStorage) ----------
+const DAILY_PROGRESS_KEY = "b2w_daily_progress";
+
+function loadDailyProgress(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(DAILY_PROGRESS_KEY) || "null"); } catch(e){}
+  const today = todayKey();
+  if(!raw || raw.date !== today){
+    raw = { date: today, completed: 0 };
+    saveDailyProgress(raw);
+  }
+  return raw;
+}
+function saveDailyProgress(p){
+  try { localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(p)); } catch(e){}
+}
+
+// Paid status is app-only. The app (paywall.js) defines window.B2W_IS_PAID
+// once it knows the purchase state; the website never defines it, so it
+// always falls back to false (the free, daily-limited experience).
+function isPaidUser(){
+  try { return typeof window.B2W_IS_PAID === "function" && !!window.B2W_IS_PAID(); } catch(e){ return false; }
+}
+
+function setFreePlayControlsVisible(visible){
+  document.getElementById("freePlayControls").style.display = visible ? "" : "none";
+  document.getElementById("newPuzzleBtn").style.display = visible ? "" : "none";
+}
+
+function updateDailyProgressLabel(){
+  const el = document.getElementById("dailyProgressLabel");
+  if(!el) return;
+  if(state.dailyIndex === null || state.dailyIndex === undefined){
+    el.textContent = "";
+    return;
+  }
+  el.textContent = `Challenge ${state.dailyIndex+1} of 4 · ${statsLabel(DAILY_TIERS[state.dailyIndex])}`;
+}
+
+// Loads the index-th (0-3) puzzle from today's fixed daily set.
+function loadDailyChallenge(index){
+  stopTimer();
+  const puzzles = buildDailyPuzzles(todayKey());
+  const p = puzzles[index];
+  const tierKey = DAILY_TIERS[index];
+  state.mode = tierKey === "curated" ? "curated" : "random";
+  state.tier = tierKey;
+  state.dailyIndex = index;
+  state.start = p.start;
+  state.target = p.end;
+  state.puzzleStart = p.start;
+  state.puzzleTarget = p.end;
+  state.shortest = p.shortest;
+  state.label = p.label;
+  state.chain = [];
+  state.current = "";
+  state.solved = false;
+  state.elapsedMs = 0;
+  state.prefill = [];
+  state.flipsUsed = 0;
+  state.gaveUp = false;
+  updateTimerDisplay();
+  document.getElementById("mercyPanel").classList.remove("show");
+  render();
+  armInviteCountdown();
+  updatePuzzleLabel();
+  updateStatsPanel();
+  updateDailyProgressLabel();
+}
+
+// Entry point for a normal (non-shared-link) visit: decides whether to show
+// the next locked daily challenge, hand a paid player back to free play, or
+// show the "come back tomorrow" screen for a free player who's done for the
+// day.
+function startDailyFlow(){
+  const progress = loadDailyProgress();
+  if(progress.completed >= 4){
+    if(isPaidUser()){
+      state.dailyIndex = null;
+      setFreePlayControlsVisible(true);
+      updateDailyProgressLabel();
+      newPuzzle();
+    } else {
+      showDailyComplete();
+    }
+    return;
+  }
+  hideDailyComplete();
+  setFreePlayControlsVisible(false);
+  loadDailyChallenge(progress.completed);
+}
+
+function showDailyComplete(){
+  document.getElementById("dailyCompleteOverlay").classList.add("show");
+}
+function hideDailyComplete(){
+  document.getElementById("dailyCompleteOverlay").classList.remove("show");
+}
+
 // ---------- Scoring ----------
 // A single comprehensive score that rewards solving efficiently (few words)
 // far more than solving fast. Word-efficiency is squared so it dominates;
@@ -903,7 +1138,8 @@ let state = {
                    // already-proven adjacent all the way to state.target, so
                    // reaching prefill[0] auto-completes the rest.
   flipsUsed: 0,
-  gaveUp: false    // true when solved via the "Uncle!" button
+  gaveUp: false,   // true when solved via the "Uncle!" button
+  dailyIndex: null // 0-3 while playing today's locked daily challenge N; null in free play/shared
 };
 
 const boardEl = document.getElementById("board");
@@ -1333,8 +1569,11 @@ function getSharedPuzzleFromURL(){
 // generating a random or curated one. Mirrors newPuzzle()'s state reset.
 function loadSharedPuzzle(p){
   stopTimer();
+  hideDailyComplete();
+  setFreePlayControlsVisible(isPaidUser() && loadDailyProgress().completed >= 4);
   state.mode = "shared";
   state.tier = "shared";
+  state.dailyIndex = null;
   state.start = p.start;
   state.target = p.end;
   state.puzzleStart = p.start;
@@ -1354,12 +1593,14 @@ function loadSharedPuzzle(p){
   armInviteCountdown();
   updatePuzzleLabel();
   updateStatsPanel();
+  updateDailyProgressLabel();
 }
 
 function newPuzzle(){
   stopTimer();
   const mode = modeSel.value;
   state.mode = mode;
+  state.dailyIndex = null;
   let p;
   if(mode === "curated"){
     p = generateCuratedPuzzle(curatedSel.value);
@@ -1388,6 +1629,7 @@ function newPuzzle(){
   armInviteCountdown();
   updatePuzzleLabel();
   updateStatsPanel();
+  updateDailyProgressLabel();
   // Timer stays at 00:00.0, not running, until the player types their
   // first letter — see startTimerIfNeeded().
 }
@@ -1636,6 +1878,7 @@ function showResults(){
   // no stats, and critically it doesn't cover the now-solved board. Just a
   // small inline note below the board, so you can still see how it plays out.
   if(state.gaveUp){
+    document.getElementById("mercyNewPuzzleBtn").textContent = nextActionLabel();
     document.getElementById("mercyPanel").classList.add("show");
     return;
   }
@@ -1666,7 +1909,47 @@ function showResults(){
   document.getElementById("shortestRow").classList.remove("open");
   document.getElementById("shortestPathChips").innerHTML = "";
 
+  // The primary button's label/behavior depends on where we are in the
+  // daily-challenge flow (see advanceAfterResult() for the matching branches).
+  document.getElementById("playAgainBtn").textContent = nextActionLabel();
+
   document.getElementById("overlay").classList.add("show");
+}
+
+// Label for whatever "what's next" button the player is about to see
+// (results modal or the Mercy panel) — kept as one function so both buttons
+// always agree on where advanceAfterResult() is about to take them.
+function nextActionLabel(){
+  if(state.dailyIndex !== null && state.dailyIndex < 3) return "Next Challenge →";
+  if(state.dailyIndex === 3) return "Finish";
+  if(state.mode === "shared") return "Play Today's Challenge";
+  return "New Puzzle";
+}
+
+// Shared "what happens when the player is done with this result" logic —
+// used by both the results modal's primary button and the Mercy panel's
+// button, so giving up via Mercy still advances the daily-challenge
+// sequence exactly like solving it normally.
+function advanceAfterResult(){
+  if(state.dailyIndex !== null){
+    const progress = loadDailyProgress();
+    progress.completed = Math.max(progress.completed, state.dailyIndex + 1);
+    saveDailyProgress(progress);
+    if(state.dailyIndex < 3){
+      loadDailyChallenge(state.dailyIndex + 1);
+    } else if(isPaidUser()){
+      state.dailyIndex = null;
+      setFreePlayControlsVisible(true);
+      updateDailyProgressLabel();
+      newPuzzle();
+    } else {
+      showDailyComplete();
+    }
+  } else if(state.mode === "shared"){
+    startDailyFlow();
+  } else {
+    newPuzzle();
+  }
 }
 
 function toggleShortestPath(){
@@ -1720,7 +2003,7 @@ function withBlurAndFocus(fn){
 
 document.getElementById("playAgainBtn").onclick = withBlurAndFocus(()=>{
   document.getElementById("overlay").classList.remove("show");
-  newPuzzle();
+  advanceAfterResult();
 });
 document.getElementById("shortestRow").onclick = withBlur(toggleShortestPath);
 
@@ -1932,7 +2215,10 @@ document.getElementById("flipBtn").onclick = withBlurAndFocus(flipIt);
 document.getElementById("uncleBtn").onclick = withBlur(openUncleConfirm);
 document.getElementById("uncleNopeBtn").onclick = withBlurAndFocus(closeUncleConfirm);
 document.getElementById("uncleYepBtn").onclick = withBlur(unclePuzzle);
-document.getElementById("mercyNewPuzzleBtn").onclick = withBlurAndFocus(newPuzzle);
+document.getElementById("mercyNewPuzzleBtn").onclick = withBlurAndFocus(()=>{
+  document.getElementById("mercyPanel").classList.remove("show");
+  advanceAfterResult();
+});
 
 function populateCuratedSelect(){
   curatedSel.innerHTML = "";
@@ -1974,7 +2260,7 @@ const sharedPuzzle = getSharedPuzzleFromURL();
 if(sharedPuzzle){
   loadSharedPuzzle(sharedPuzzle);
 } else {
-  newPuzzle();
+  startDailyFlow();
 }
 </script>
 
