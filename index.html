@@ -794,6 +794,7 @@
   <p class="daily-complete-emoji">🎉</p>
   <h2>Great to see you!</h2>
   <p class="daily-complete-sub">You've finished today's 4 challenges — Easy, Medium, Hard, and a Fun Word Pair. Come back tomorrow for a brand new set.</p>
+  <button id="dailyCompleteUnlockBtn" class="primary" type="button" style="display:none;">Unlock Unlimited Play</button>
 </div>
 
 <div id="uncleOverlay">
@@ -1073,21 +1074,23 @@ function loadDailyChallenge(index){
   updateDailyProgressLabel();
 }
 
-// Entry point for a normal (non-shared-link) visit: decides whether to show
-// the next locked daily challenge, hand a paid player back to free play, or
-// show the "come back tomorrow" screen for a free player who's done for the
-// day.
+// Entry point for a normal (non-shared-link) visit: a paid player always
+// gets unlimited free play immediately — the one-time purchase removes the
+// daily gate entirely, on every future visit, not just after that day's set
+// is finished. Only a non-paid player is walked through today's locked
+// Easy->Medium->Hard->Fun set, then shown the "come back tomorrow" screen.
 function startDailyFlow(){
+  if(isPaidUser()){
+    state.dailyIndex = null;
+    hideDailyComplete();
+    setFreePlayControlsVisible(true);
+    updateDailyProgressLabel();
+    newPuzzle();
+    return;
+  }
   const progress = loadDailyProgress();
   if(progress.completed >= 4){
-    if(isPaidUser()){
-      state.dailyIndex = null;
-      setFreePlayControlsVisible(true);
-      updateDailyProgressLabel();
-      newPuzzle();
-    } else {
-      showDailyComplete();
-    }
+    showDailyComplete();
     return;
   }
   hideDailyComplete();
@@ -1096,11 +1099,35 @@ function startDailyFlow(){
 }
 
 function showDailyComplete(){
+  // The "Unlock Unlimited Play" button only makes sense where a purchase is
+  // possible at all — the app build defines window.B2WPaywall; the website
+  // never does, so the button stays hidden there and this is a no-op.
+  const unlockBtn = document.getElementById("dailyCompleteUnlockBtn");
+  unlockBtn.style.display = window.B2WPaywall ? "" : "none";
   document.getElementById("dailyCompleteOverlay").classList.add("show");
 }
 function hideDailyComplete(){
   document.getElementById("dailyCompleteOverlay").classList.remove("show");
 }
+document.getElementById("dailyCompleteUnlockBtn").onclick = withBlur(()=>{
+  if(window.B2WPaywall) window.B2WPaywall.showModal();
+});
+
+// Self-heals a stale "Great to see you!" lock screen when the app/tab comes
+// back to the foreground WITHOUT a full page reload (the common case for
+// briefly switching away and back on iOS — the WKWebView keeps running in
+// memory rather than reloading). Without this, a player who purchases from
+// that screen and then just backgrounds/foregrounds the app, or who leaves
+// it running overnight into a new calendar day, can be stuck looking at
+// yesterday's locked screen forever, even though re-evaluating right now
+// would correctly unlock them. Scoped to only fire while that screen is
+// actually showing, so it never interrupts someone mid-puzzle.
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState !== "visible") return;
+  if(document.getElementById("dailyCompleteOverlay").classList.contains("show")){
+    startDailyFlow();
+  }
+});
 
 // ---------- Scoring ----------
 // A single comprehensive score that rewards solving efficiently (few words)
@@ -1570,7 +1597,7 @@ function getSharedPuzzleFromURL(){
 function loadSharedPuzzle(p){
   stopTimer();
   hideDailyComplete();
-  setFreePlayControlsVisible(isPaidUser() && loadDailyProgress().completed >= 4);
+  setFreePlayControlsVisible(isPaidUser());
   state.mode = "shared";
   state.tier = "shared";
   state.dailyIndex = null;
